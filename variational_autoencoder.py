@@ -1,12 +1,13 @@
 import os
 import pickle
 
-from tensorflow.keras import Model
-from tensorflow.keras.layers import Input, Conv2D, ReLU, BatchNormalization, \
+from tensorflow import keras
+from keras import Model
+from keras.layers import Input, Conv2D, ReLU, BatchNormalization, \
     Flatten, Dense, Reshape, Conv2DTranspose, Activation, Lambda
-from tensorflow.keras import backend as K
-from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.losses import MeanSquaredError
+from keras import backend as K
+from keras.optimizers import Adam
+from keras.losses import MeanSquaredError
 import numpy as np
 import tensorflow as tf
 import datetime
@@ -235,8 +236,7 @@ class VAE:
         self._shape_before_bottleneck = K.int_shape(x)[1:]
         x = Flatten()(x)
         self.mu = Dense(self.latent_space_dim, name="mu")(x)
-        self.log_variance = Dense(self.latent_space_dim,
-                                  name="log_variance")(x)
+        self.log_variance = Dense(self.latent_space_dim, name="log_variance")(x)
 
         def sample_point_from_normal_distribution(args):
             mu, log_variance = args
