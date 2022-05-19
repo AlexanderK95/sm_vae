@@ -8,7 +8,7 @@ from PIL import Image
 import glob
 import random
 
-#physical_devices = tf.config.list_physical_devices('GPU')
+physical_devices = tf.config.list_physical_devices('GPU')
 #tf.config.experimental.set_memory_growth(physical_devices[0], True)
 # mirrored_strategy = tf.distribute.experimental.CentralStorageStrategy(devices=["/gpu:0","/gpu:1"])
 
@@ -16,8 +16,8 @@ LEARNING_RATE = 0.00001
 BATCH_SIZE = 64
 EPOCHS = 1000
 
-gpus=tf.config.get_visible_devices('GPU')
-tf.config.set_visible_devices(gpus[1],'GPU')
+# gpus=tf.config.get_visible_devices('GPU')
+# tf.config.set_visible_devices(gpus[1],'GPU')
 
 
 def load_mnist():
@@ -32,7 +32,7 @@ def load_mnist():
 
 def load_faces():
     file_list = glob.glob('/home/alexanderk/Documents/Datasets/faces/*jpg')
-    x_train = np.array([np.array(Image.open(fname).resize((256,256))) for fname in file_list])
+    x_train = np.array([np.array(Image.open(fname).resize((128,128))) for fname in file_list])
     x_train = x_train.astype("float32") / 255
     # x_train = np.mean(x_train, axis=3)
     # x_train = x_train.reshape(x_train.shape + (1,))
@@ -45,10 +45,11 @@ def load_selfmotion(share=100):
     file_list = glob.glob('/home/alexanderk/Documents/Datasets/selfmotion_imgs/selfmotion_imgs/*jpg')
     random.shuffle(file_list)
     num_images_to_load = round(len(file_list) * share / 100)
+    print(f"#samples:  {num_images_to_load}")
     x_train = np.array([np.array(Image.open(fname).resize((256,256))) for fname in file_list[0:num_images_to_load-1]])
     x_train = x_train.astype("float32") / 255
-    x_train = np.mean(x_train, axis=3)
-    x_train = x_train.reshape(x_train.shape + (1,))
+    # x_train = np.mean(x_train, axis=3)
+    # x_train = x_train.reshape(x_train.shape + (1,))
 
     y_train, x_test, y_test = (np.array(range(len(x_train))), x_train, np.array(range(len(x_train))))
 
@@ -81,13 +82,13 @@ if __name__ == "__main__":
     # autoencoder.train(x_train, BATCH_SIZE, EPOCHS)
     # print("saving model")
     # autoencoder.save("model")
-    with tf.device("/gpu:1"):
-        x_train, _, _, _ = load_selfmotion()
-        # plt.imshow(x_train[0])
-        # plt.show()
-        # with mirrored_strategy.scope():
-        autoencoder = train(x_train, LEARNING_RATE, BATCH_SIZE, EPOCHS)
-        # autoencoder = VAE.load("vae_faces")
-        # autoencoder.compile(LEARNING_RATE)
-        # autoencoder.train(x_train, BATCH_SIZE, EPOCHS)
-        autoencoder.save("vae_sm2")
+    # with tf.device("/gpu:1"):
+    x_train, _, _, _ = load_selfmotion()
+    plt.imshow(x_train[0])
+    plt.show()
+    # with mirrored_strategy.scope():
+    autoencoder = train(x_train, LEARNING_RATE, BATCH_SIZE, EPOCHS)
+    # autoencoder = VAE.load("vae_faces")
+    # autoencoder.compile(LEARNING_RATE)
+    # autoencoder.train(x_train, BATCH_SIZE, EPOCHS)
+    autoencoder.save("vae_sm")
