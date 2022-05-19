@@ -58,9 +58,9 @@ class VAE:
                                     self._calculate_kl_loss])
 
     def train(self, x_train, batch_size, num_epochs):
-    	self.log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    	self.tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=self.log_dir, histogram_freq=1)
-    	self.model.fit(x_train,
+        self.log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        self.tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=self.log_dir, histogram_freq=1)
+        self.model.fit(x_train,
                        x_train,
                        batch_size=batch_size,
                        epochs=num_epochs,
