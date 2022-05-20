@@ -1,13 +1,13 @@
 import os
 import pickle
 
-from tensorflow import keras
-from keras import Model
-from keras.layers import Input, Conv2D, ReLU, BatchNormalization, \
+# from tensorflow import keras
+from tensorflow.keras import Model
+from tensorflow.keras.layers import Input, Conv2D, ReLU, BatchNormalization, \
     Flatten, Dense, Reshape, Conv2DTranspose, Activation, Lambda
-from keras import backend as K
-from keras.optimizers import Adam
-from keras.losses import MeanSquaredError
+from tensorflow.keras import backend as K
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.losses import MeanSquaredError
 import numpy as np
 import tensorflow as tf
 import datetime

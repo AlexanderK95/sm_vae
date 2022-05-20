@@ -5,13 +5,13 @@ from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
 import pickle
 import tensorflow as tf
-from tensorflow import keras
-from keras import layers
-from keras import backend as K
+# from tensorflow import keras
+from tensorflow.keras import layers
+from tensorflow.keras import backend as K
 from IPython import display
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
-
+tf.compat.v1.disable_eager_execution()
 
 
 class VAE:
@@ -62,8 +62,9 @@ class VAE:
         self._build_autoencoder()
 
     def _build_encoder(self):
-        input = keras.Input(shape=self.input_shape, name='input_layer')
-        x = input
+        encoder_input = tf.keras.Input(shape=self.input_shape, name='input_layer')
+        self._model_input = encoder_input
+        x = encoder_input
 
         # Convolution blocks (conv layers + (leaky) ReLU + Batch norm)
         for layer_index in range(self._num_conv_layers):
@@ -92,13 +93,13 @@ class VAE:
             return sampled_point
 
         output = layers.Lambda(sample_point_from_normal_distribution, name="lambda")([self.mean, self.log_var])
-        self.encoder = tf.keras.Model(input, output, name="Encoder")
+        self.encoder = tf.keras.Model(encoder_input, output, name="Encoder")
 
     def _build_decoder(self):
         num_neurons = np.prod(self._shape_before_bottleneck)
 
-        input = keras.Input(shape=self.latent_space_dim, name='input_layer')
-        dense_layer = layers.Dense(num_neurons, name="dense_1")(input)
+        decoder_input = tf.keras.Input(shape=self.latent_space_dim, name='input_layer')
+        dense_layer = layers.Dense(num_neurons, name="dense_1")(decoder_input)
         x = layers.Reshape(self._shape_before_bottleneck, name='Reshape')(dense_layer)
 
         for layer_index in reversed(range(1, self._num_conv_layers)):
@@ -115,7 +116,7 @@ class VAE:
             x = layers.BatchNormalization(name=f"bn_{layer_num}")(x)
 
         output = layers.Conv2DTranspose(
-            filters=1,
+            filters=self.input_shape[2],
             kernel_size=self.conv_kernels[0],
             strides=self.conv_strides[0],
             padding="same",
@@ -123,7 +124,7 @@ class VAE:
             name=f"conv_transpose_{self._num_conv_layers}"
         )(x)
 
-        self.decoder = tf.keras.Model(input, output, name="Decoder")
+        self.decoder = tf.keras.Model(decoder_input, output, name="Decoder")
 
     def _build_autoencoder(self):
         model_input = self._model_input
@@ -248,15 +249,15 @@ if __name__ == "__main__":
     img_height, img_width = 256, 256
     batch_size = 128
 
-    train_ds = tf.keras.preprocessing.image_dataset_from_directory(
-        'E:\Datasets\selfmotion_imgs',
-        image_size=(img_height, img_width),
-        batch_size=batch_size,
-        label_mode=None
-    )
+    # train_ds = tf.keras.preprocessing.image_dataset_from_directory(
+    #     'E:\Datasets\selfmotion_imgs',
+    #     image_size=(img_height, img_width),
+    #     batch_size=batch_size,
+    #     label_mode=None
+    # )
 
     vae = VAE(
-        input_shape=(img_height, img_width, 1),
+        input_shape=(img_height, img_width, 3),
         conv_filters=(32, 64, 64, 64),
         conv_kernels=(3, 3, 3, 3),
         conv_strides=(1, 2, 2, 1),
