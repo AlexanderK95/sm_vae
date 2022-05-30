@@ -5,13 +5,15 @@ from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
 import pickle
 import tensorflow as tf
-# from tensorflow import keras
-from tensorflow.keras import layers
+# from keras import layers
 from tensorflow.keras import backend as K
 from IPython import display
+import datetime
+import math
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 tf.compat.v1.disable_eager_execution()
+# tf.config.run_functions_eagerly(True)
 
 
 class VAE:
@@ -29,6 +31,7 @@ class VAE:
         self.model = None
 
         self._optimizer = tf.keras.optimizers.Adam(lr = 0.0001)
+        self._checkpoint_filepath = './tmp/checkpoint'
 
         self._num_conv_layers = len(conv_filters)
         self._shape_before_bottleneck = None
@@ -43,6 +46,19 @@ class VAE:
     def load_dataset(self):
         pass
 
+    def save(self, save_folder="."):
+        self._create_folder_if_it_doesnt_exist(save_folder)
+        self._save_parameters(save_folder)
+        self._save_weights(save_folder)
+
+    def load_weights(self, weights_path):
+        self.model.load_weights(weights_path)
+
+    def reconstruct(self, images):
+        latent_representations = self.encoder.predict(images)
+        reconstructed_images = self.decoder.predict(latent_representations)
+        return reconstructed_images, latent_representations
+
     def summary(self):
         self.encoder.summary()
         self.decoder.summary()
@@ -51,10 +67,38 @@ class VAE:
     def compile(self, learning_rate=0.0001):
         # optimizer = Adam(learning_rate=learning_rate)
         optimizer = tf.optimizers.Adam()
-        self.model.compile(optimizer=optimizer,
-                           loss=self._calculate_combined_loss,
-                           metrics=[self._calculate_reconstruction_loss,
-                                    self._calculate_kl_loss])
+        self.model.compile(
+            optimizer=optimizer,
+            loss=self._combined_loss,
+            metrics=[self._mse_loss,
+                    self._kl_loss])
+
+
+    def train(self, train_ds, val_ds, num_epochs, checkpoint_interval=50):
+        
+        model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
+            filepath="tmp/checkpoints/",
+            monitor='val_loss',
+            verbose = 1,
+            save_best_only=True,
+            save_weights_only=True,
+            mode='min',
+            save_freq = 'epoch',
+            period = checkpoint_interval)
+        self.log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        self.tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=self.log_dir, histogram_freq=1)
+        self.model.fit(
+            train_ds,
+            validation_data=val_ds,
+            # batch_size=batch_size,
+            epochs=num_epochs,
+            shuffle=True,
+            callbacks=[
+                self.tensorboard_callback,
+                model_checkpoint_callback,
+                tf.keras.callbacks.LearningRateScheduler(lambda epoch: 0.0001 * math.exp(-0.001*epoch))
+            ]
+        )
 
     def _build(self):
         self._build_encoder()
@@ -66,10 +110,13 @@ class VAE:
         self._model_input = encoder_input
         x = encoder_input
 
+        # Normalization layer
+        # x = tf.keras.layers.Rescaling(1./255, input_shape=self.input_shape, name="norm_layer")(x)
+
         # Convolution blocks (conv layers + (leaky) ReLU + Batch norm)
         for layer_index in range(self._num_conv_layers):
             layer_number = layer_index + 1
-            x = layers.Conv2D(
+            x = tf.keras.layers.Conv2D(
                 filters=self.conv_filters[layer_index],
                 kernel_size=self.conv_kernels[layer_index],
                 strides=self.conv_strides[layer_index],
@@ -77,14 +124,14 @@ class VAE:
                 name=f"conv_{layer_number}"
             )(x)
             # x = layers.ReLU(name=f"relu_{layer_number}")(x)
-            x = layers.LeakyReLU(name=f"lrelu_{layer_number}")(x)
-            x = layers.BatchNormalization(name=f"bn_{layer_number}")(x)
+            x = tf.keras.layers.LeakyReLU(name=f"lrelu_{layer_number}")(x)
+            x = tf.keras.layers.BatchNormalization(name=f"bn_{layer_number}")(x)
 
         # Final Block
         self._shape_before_bottleneck = K.int_shape(x)[1:]
-        flatten = layers.Flatten()(x)
-        self.mean = layers.Dense(self.latent_space_dim, name='mean')(flatten)
-        self.log_var = layers.Dense(self.latent_space_dim, name='log_var')(flatten)
+        flatten = tf.keras.layers.Flatten()(x)
+        self.mean = tf.keras.layers.Dense(self.latent_space_dim, name='mean')(flatten)
+        self.log_var = tf.keras.layers.Dense(self.latent_space_dim, name='log_var')(flatten)
 
         def sample_point_from_normal_distribution(args):
             mu, log_variance = args
@@ -92,19 +139,19 @@ class VAE:
             sampled_point = mu + K.exp(log_variance / 2) * epsilon
             return sampled_point
 
-        output = layers.Lambda(sample_point_from_normal_distribution, name="lambda")([self.mean, self.log_var])
+        output = tf.keras.layers.Lambda(sample_point_from_normal_distribution, name="lambda")([self.mean, self.log_var])
         self.encoder = tf.keras.Model(encoder_input, output, name="Encoder")
 
     def _build_decoder(self):
         num_neurons = np.prod(self._shape_before_bottleneck)
 
         decoder_input = tf.keras.Input(shape=self.latent_space_dim, name='input_layer')
-        dense_layer = layers.Dense(num_neurons, name="dense_1")(decoder_input)
-        x = layers.Reshape(self._shape_before_bottleneck, name='Reshape')(dense_layer)
+        dense_layer = tf.keras.layers.Dense(num_neurons, name="dense_1")(decoder_input)
+        x = tf.keras.layers.Reshape(self._shape_before_bottleneck, name='Reshape')(dense_layer)
 
         for layer_index in reversed(range(1, self._num_conv_layers)):
             layer_num = self._num_conv_layers - layer_index
-            x = layers.Conv2DTranspose(
+            x = tf.keras.layers.Conv2DTranspose(
                 filters=self.conv_filters[layer_index],
                 kernel_size=self.conv_kernels[layer_index],
                 strides=self.conv_strides[layer_index],
@@ -112,10 +159,10 @@ class VAE:
                 name=f"conv_transpose_{layer_num}"
             )(x)
             # x = layers.ReLU(name=f"relu_{layer_num}")(x)
-            x = layers.LeakyReLU(name=f"lrelu_{layer_num}")(x)
-            x = layers.BatchNormalization(name=f"bn_{layer_num}")(x)
+            x = tf.keras.layers.LeakyReLU(name=f"lrelu_{layer_num}")(x)
+            x = tf.keras.layers.BatchNormalization(name=f"bn_{layer_num}")(x)
 
-        output = layers.Conv2DTranspose(
+        output = tf.keras.layers.Conv2DTranspose(
             filters=self.input_shape[2],
             kernel_size=self.conv_kernels[0],
             strides=self.conv_strides[0],
@@ -129,7 +176,7 @@ class VAE:
     def _build_autoencoder(self):
         model_input = self._model_input
         model_output = self.decoder(self.encoder(model_input))
-        self.model = tf.keras.Model(model_input, model_output, name="vAutoencoder")
+        self.model = tf.keras.Model(model_input, model_output, name="VAE")
 
     def _combined_loss(self, y_true, y_pred):
         reconstruction_loss = self._mse_loss(y_true, y_pred)
@@ -141,24 +188,15 @@ class VAE:
         r_loss = K.mean(K.square(y_true - y_pred), axis = [1,2,3])
         return r_loss
 
-    def _kl_loss(self):
-        kl_loss =  -0.5 * K.sum(1 + self.log_var - K.square(self.mean) - K.exp(self.log_var), axis = 1)
+    def _kl_loss(self, y_true, y_pred):
+        kl_loss = -0.5 * K.sum(1 + self.log_var - K.square(self.mean) - K.exp(self.log_var), axis = 1)
         return kl_loss
 
-    @tf.function
-    def train_step(self, images):
+    def _create_folder_if_it_doesnt_exist(self, folder):
+        if not os.path.exists(folder):
+            os.makedirs(folder)
 
-        with tf.GradientTape() as tape:
-            generated_images = self.model(images, training=True)
-            loss = self._combined_loss(images, generated_images)
-
-        gradients_of_model = tape.gradient(loss, self.model.trainable_variables)
-
-        self._optimizer.apply_gradients(zip(gradients_of_model, self.model.trainable_variables))
-        return loss
-
-    def train(self, dataset, epochs):
-
+    def _save_parameters(self, save_folder):
         parameters = [
             self.input_shape,
             self.conv_filters,
@@ -166,53 +204,13 @@ class VAE:
             self.conv_strides,
             self.latent_space_dim
         ]
-        save_path = os.path.join("tf_vae/scene_imgs", "parameters.pkl")
+        save_path = os.path.join(save_folder, "parameters.pkl")
         with open(save_path, "wb") as f:
             pickle.dump(parameters, f)
-        for epoch in range(epochs):
-            start = time.time()
-            i = 0
-            loss_ = []
-            for image_batch in dataset:
-                i += 1
-                loss = train_step(image_batch)
-                loss_.append(loss)
 
-            print("Loss: ",np.mean(loss_))
-            seed = image_batch[:25]
-            display.clear_output(wait=True)
-            # generate_and_save_images([enc,final,dec],
-            #                         epoch + 1,
-            #                         seed)
-            # Save the model every 15 epochs
-            if (epoch + 1) % 15 == 0:
-                self.model.save_weights('tf_vae/scene_imgs/training_weights/enc_'+ str(epoch)+'.h5')
-            print ('Time for epoch {} is {} sec'.format(epoch + 1, time.time()-start))
-
-        # Generate after the final epoch
-        # display.clear_output(wait=True)
-        # generate_and_save_images(
-        #     [enc,final,dec],
-        #     epochs,
-        #     seed
-        # )
-
-
-
-    # def train(self, x_train, batch_size, num_epochs):
-    #     self.log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    #     self.tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=self.log_dir, histogram_freq=1)
-    #     self.model.fit(
-    #         x_train,
-    #         x_train,
-    #         batch_size=batch_size,
-    #         epochs=num_epochs,
-    #         shuffle=True,
-    #         callbacks=[
-    #         self.tensorboard_callback,
-    #         tf.keras.callbacks.LearningRateScheduler(
-    #             lambda epoch: 0.0001 * math.exp(-0.001*epoch)
-    #     )])
+    def _save_weights(self, save_folder):
+        save_path = os.path.join(save_folder, "weights.h5")
+        self.model.save_weights(save_path)
 
 
 
@@ -249,21 +247,59 @@ if __name__ == "__main__":
     img_height, img_width = 256, 256
     batch_size = 128
 
-    # train_ds = tf.keras.preprocessing.image_dataset_from_directory(
-    #     'E:\Datasets\selfmotion_imgs',
-    #     image_size=(img_height, img_width),
-    #     batch_size=batch_size,
-    #     label_mode=None
-    # )
+    
+
+
+
+    train_ds = tf.keras.preprocessing.image_dataset_from_directory(
+        'E:\Datasets\selfmotion_imgs',
+        validation_split=0.2,
+        subset="training",
+        image_size=(img_height, img_width),
+        batch_size=batch_size,
+        label_mode=None,
+        seed = 2451
+    )
+
+    val_ds = tf.keras.preprocessing.image_dataset_from_directory(
+        'E:\Datasets\selfmotion_imgs',
+        validation_split=0.2,
+        subset="validation",
+        image_size=(img_height, img_width),
+        batch_size=batch_size,
+        label_mode=None,
+        seed = 2451
+    )
+
+    # plt.figure(figsize=(10, 10))
+    # for images in train_ds.take(1):
+    #     for i in range(9):
+    #         ax = plt.subplot(3, 3, i + 1)
+    #         plt.imshow(images[i].numpy().astype("uint8"))
+    #         plt.axis("off")
+    # plt.show()
+
+    # for image_batch in train_ds:
+    #     print(image_batch.shape)
+    #     break
+
+    AUTOTUNE = tf.data.AUTOTUNE
+
+    train_ds = train_ds.cache().shuffle(50).prefetch(buffer_size=AUTOTUNE)
+    val_ds = val_ds.cache().prefetch(buffer_size=AUTOTUNE)
+
+    
 
     vae = VAE(
         input_shape=(img_height, img_width, 3),
-        conv_filters=(32, 64, 64, 64),
-        conv_kernels=(3, 3, 3, 3),
-        conv_strides=(1, 2, 2, 1),
+        conv_filters=(64, 128, 64, 64, 32),
+        conv_kernels=(4, 4, 3, 3, 4),
+        conv_strides=(2, 2, 2, 2, 2),
         latent_space_dim=200
     )
     vae.summary()
+    # vae.compile()
+    # vae.train(train_ds, val_ds, 10, checkpoint_interval=1)
 
     pass
 
