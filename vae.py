@@ -11,7 +11,11 @@ from IPython import display
 import datetime
 import math
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+from PIL import Image
+import glob
+import random
+
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 tf.compat.v1.disable_eager_execution()
 # tf.config.run_functions_eagerly(True)
 
@@ -23,7 +27,7 @@ class VAE:
         self.conv_kernels = conv_kernels # [3, 5, 3]
         self.conv_strides = conv_strides # [1, 2, 2]
         self.latent_space_dim = latent_space_dim # 2
-        self.reconstruction_loss_weight = 500
+        self.reconstruction_loss_weight = 10000
 
         self.dataset = None
         self.encoder = None
@@ -78,7 +82,7 @@ class VAE:
         
         model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
             filepath="tmp/checkpoints/",
-            monitor='val_loss',
+            monitor='loss',
             verbose = 1,
             save_best_only=True,
             save_weights_only=True,
@@ -89,8 +93,34 @@ class VAE:
         self.tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=self.log_dir, histogram_freq=1)
         self.model.fit(
             train_ds,
-            validation_data=val_ds,
+            # validation_data=val_ds,
             # batch_size=batch_size,
+            epochs=num_epochs,
+            shuffle=True,
+            callbacks=[
+                self.tensorboard_callback,
+                model_checkpoint_callback,
+                tf.keras.callbacks.LearningRateScheduler(lambda epoch: 0.0001 * math.exp(-0.001*epoch))
+            ]
+        )
+
+    def train2(self, train_ds, batch_size, num_epochs, checkpoint_interval=50):
+        
+        model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
+            filepath="tmp/checkpoints/",
+            monitor='loss',
+            verbose = 1,
+            save_best_only=True,
+            save_weights_only=True,
+            mode='min',
+            save_freq = 'epoch',
+            period = checkpoint_interval)
+        self.log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        self.tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=self.log_dir, histogram_freq=1)
+        self.model.fit(
+            train_ds,
+            train_ds,
+            batch_size=batch_size,
             epochs=num_epochs,
             shuffle=True,
             callbacks=[
@@ -241,35 +271,46 @@ class VAE:
 #     plt.savefig('tf_vae/scene_imgs/images/image_at_epoch_{:d}.png'.format(epoch))
 #     plt.show()
 
+def load_selfmotion(share=100):
+    print("loading Dataset...")
+    file_list = glob.glob('/home/alexanderk/Documents/Datasets/selfmotion_imgs/dump/*jpg')
+    random.shuffle(file_list)
+    num_images_to_load = round(len(file_list) * share / 100)
+    print(f"#samples:  {num_images_to_load}")
+    x_train = np.array([np.array(Image.open(fname).resize((256,256))) for fname in file_list[0:num_images_to_load-1]])
+    x_train = x_train.astype("float32") / 255
+    x_train = np.mean(x_train, axis=3)
+    x_train = x_train.reshape(x_train.shape + (1,))
+
+    y_train, x_test, y_test = (np.array(range(len(x_train))), x_train, np.array(range(len(x_train))))
+
+    return x_train, y_train, x_test, y_test
 
 if __name__ == "__main__":
 
     img_height, img_width = 256, 256
     batch_size = 128
 
-    
 
+    # train_ds = tf.keras.preprocessing.image_dataset_from_directory(
+    #     '/home/alexanderk/Documents/Datasets/selfmotion_imgs/',
+    #     validation_split=0.2,
+    #     subset="training",
+    #     image_size=(img_height, img_width),
+    #     batch_size=batch_size,
+    #     label_mode=None,
+    #     seed = 2451
+    # )
 
-
-    train_ds = tf.keras.preprocessing.image_dataset_from_directory(
-        'E:\Datasets\selfmotion_imgs',
-        validation_split=0.2,
-        subset="training",
-        image_size=(img_height, img_width),
-        batch_size=batch_size,
-        label_mode=None,
-        seed = 2451
-    )
-
-    val_ds = tf.keras.preprocessing.image_dataset_from_directory(
-        'E:\Datasets\selfmotion_imgs',
-        validation_split=0.2,
-        subset="validation",
-        image_size=(img_height, img_width),
-        batch_size=batch_size,
-        label_mode=None,
-        seed = 2451
-    )
+    # val_ds = tf.keras.preprocessing.image_dataset_from_directory(
+    #     '/home/alexanderk/Documents/Datasets/selfmotion_imgs/',
+    #     validation_split=0.2,
+    #     subset="validation",
+    #     image_size=(img_height, img_width),
+    #     batch_size=batch_size,
+    #     label_mode=None,
+    #     seed = 2451
+    # )
 
     # plt.figure(figsize=(10, 10))
     # for images in train_ds.take(1):
@@ -283,24 +324,25 @@ if __name__ == "__main__":
     #     print(image_batch.shape)
     #     break
 
-    AUTOTUNE = tf.data.AUTOTUNE
+    # AUTOTUNE = tf.data.AUTOTUNE
 
-    train_ds = train_ds.cache().shuffle(50).prefetch(buffer_size=AUTOTUNE)
-    val_ds = val_ds.cache().prefetch(buffer_size=AUTOTUNE)
+    # train_ds = train_ds.cache().shuffle(1000).prefetch(buffer_size=AUTOTUNE)
+    # val_ds = val_ds.cache().prefetch(buffer_size=AUTOTUNE)
 
-    
+    x_train, _, _, _ = load_selfmotion(100)
 
     vae = VAE(
-        input_shape=(img_height, img_width, 3),
+        input_shape=(img_height, img_width, 1),
         conv_filters=(64, 128, 64, 64, 32),
         conv_kernels=(4, 4, 3, 3, 4),
         conv_strides=(2, 2, 2, 2, 2),
         latent_space_dim=200
     )
     vae.summary()
-    # vae.compile()
+    vae.compile()
     # vae.train(train_ds, val_ds, 10, checkpoint_interval=1)
-
+    vae.train(x_train, batch_size, 1000)
+    vae.save("vae_sm2")
     pass
 
     # plt.figure(figsize=(10, 10))
