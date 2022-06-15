@@ -1,13 +1,14 @@
+# print("inside vae.py")
 import os
 import time
 import numpy as np
-from sklearn.manifold import TSNE
-import matplotlib.pyplot as plt
+# from sklearn.manifold import TSNE
+# import matplotlib.pyplot as plt
 import pickle
 import tensorflow as tf
 # from keras import layers
 from tensorflow.keras import backend as K
-from IPython import display
+# from IPython import display
 import datetime
 import math
 
@@ -15,13 +16,14 @@ from PIL import Image
 import glob
 import random
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+# os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 tf.compat.v1.disable_eager_execution()
 # tf.config.run_functions_eagerly(True)
 
 
 class VAE:
     def __init__(self,input_shape, conv_filters, conv_kernels, conv_strides, latent_space_dim):
+        print("initializing vae...")
         self.input_shape = input_shape # [28, 28, 1]
         self.conv_filters = conv_filters # [2, 4, 8]
         self.conv_kernels = conv_kernels # [3, 5, 3]
@@ -70,7 +72,7 @@ class VAE:
 
     def compile(self, learning_rate=0.0001):
         # optimizer = Adam(learning_rate=learning_rate)
-        optimizer = tf.optimizers.Adam()
+        optimizer = tf.optimizers.Adam(learning_rate=learning_rate)
         self.model.compile(
             optimizer=optimizer,
             loss=self._combined_loss,
@@ -126,7 +128,7 @@ class VAE:
             callbacks=[
                 self.tensorboard_callback,
                 model_checkpoint_callback,
-                tf.keras.callbacks.LearningRateScheduler(lambda epoch: 0.0001 * math.exp(-0.001*epoch))
+                # tf.keras.callbacks.LearningRateScheduler(lambda epoch: 0.0001 * math.exp(-0.001*epoch))
             ]
         )
 
@@ -273,7 +275,7 @@ class VAE:
 
 def load_selfmotion(share=100):
     print("loading Dataset...")
-    file_list = glob.glob('/home/alexanderk/Documents/Datasets/selfmotion_imgs/dump/*jpg')
+    file_list = glob.glob('/home/kressal/datasets/selfmotion_imgs/*jpg')
     random.shuffle(file_list)
     num_images_to_load = round(len(file_list) * share / 100)
     print(f"#samples:  {num_images_to_load}")
@@ -287,9 +289,12 @@ def load_selfmotion(share=100):
     return x_train, y_train, x_test, y_test
 
 if __name__ == "__main__":
+    
+    print(tf.__version__)
+    print("running main...")
 
     img_height, img_width = 256, 256
-    batch_size = 128
+    batch_size = 16
 
 
     # train_ds = tf.keras.preprocessing.image_dataset_from_directory(
@@ -329,7 +334,7 @@ if __name__ == "__main__":
     # train_ds = train_ds.cache().shuffle(1000).prefetch(buffer_size=AUTOTUNE)
     # val_ds = val_ds.cache().prefetch(buffer_size=AUTOTUNE)
 
-    x_train, _, _, _ = load_selfmotion(100)
+    x_train, _, _, _ = load_selfmotion(1)
 
     vae = VAE(
         input_shape=(img_height, img_width, 1),
@@ -338,12 +343,12 @@ if __name__ == "__main__":
         conv_strides=(2, 2, 2, 2, 2),
         latent_space_dim=200
     )
-    vae.summary()
+    # vae.summary()
     vae.compile()
     # vae.train(train_ds, val_ds, 10, checkpoint_interval=1)
-    vae.train(x_train, batch_size, 1000)
-    vae.save("vae_sm2")
-    pass
+    vae.train2(x_train, batch_size, 10)
+    # vae.save("vae_sm2")
+    # pass
 
     # plt.figure(figsize=(10, 10))
     # for images in train_ds.take(1):

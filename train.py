@@ -16,7 +16,7 @@ os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
 LEARNING_RATE = 0.00001
 BATCH_SIZE = 32
-EPOCHS = 200
+EPOCHS = 10
 
 # gpus=tf.config.get_visible_devices('GPU')
 # tf.config.set_visible_devices(gpus[1],'GPU')
@@ -44,7 +44,7 @@ def load_faces():
     return x_train, y_train, x_test, y_test
 
 def load_selfmotion(share=100):
-    file_list = glob.glob('/home/alexanderk/Documents/Datasets/selfmotion_imgs/dump/*jpg')
+    file_list = glob.glob('/home/kressal/datasets/selfmotion_imgs/*jpg')
     random.shuffle(file_list)
     num_images_to_load = round(len(file_list) * share / 100)
     print(f"#samples:  {num_images_to_load}")
