@@ -1,6 +1,7 @@
 # print("inside vae.py")
 import os
 import time
+import imageio
 import numpy as np
 # from sklearn.manifold import TSNE
 # import matplotlib.pyplot as plt
@@ -16,13 +17,12 @@ from PIL import Image
 import glob
 import random
 
-import pandas as pd
-
-from create_db import CustomDataGen
+# from create_db import CustomDataGen
 
 # os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 tf.compat.v1.disable_eager_execution()
-# tf.config.run_functions_eagerly(True)
+# tf.config.experimental_run_functions_eagerly(True)
+# tf.compat.v1.experimental.output_all_intermediates(False)
 
 
 class VAE:
@@ -84,7 +84,7 @@ class VAE:
                     self._kl_loss])
 
 
-    def train(self, train_ds, val_ds, num_epochs, checkpoint_interval=50):
+    def train(self, train_ds, batch_size, num_epochs, checkpoint_interval=50):
         
         model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
             filepath="tmp/checkpoints/",
@@ -95,16 +95,19 @@ class VAE:
             mode='min',
             save_freq = 'epoch',
             period = checkpoint_interval)
+        early_stopping_callback = tf.keras.callbacks.EarlyStopping(monitor='loss')
         self.log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
         self.tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=self.log_dir, histogram_freq=1)
         self.model.fit(
             train_ds,
+            train_ds,
             # validation_data=val_ds,
-            # batch_size=batch_size,
+            batch_size=batch_size,
             epochs=num_epochs,
             shuffle=True,
             callbacks=[
                 self.tensorboard_callback,
+                early_stopping_callback,
                 model_checkpoint_callback,
                 tf.keras.callbacks.LearningRateScheduler(lambda epoch: 0.0001 * math.exp(-0.001*epoch))
             ]
@@ -124,7 +127,8 @@ class VAE:
         self.log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
         self.tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=self.log_dir, histogram_freq=1)
         self.model.fit(
-            train_ds,
+            x = train_ds,
+            verbose=2,
             epochs=num_epochs,
             callbacks=[
                 self.tensorboard_callback,
@@ -156,28 +160,30 @@ class VAE:
                 padding="same",
                 name=f"conv_{layer_number}"
             )(x)
-            # x = layers.ReLU(name=f"relu_{layer_number}")(x)
-            x = tf.keras.layers.LeakyReLU(name=f"lrelu_{layer_number}")(x)
+            x = tf.keras.layers.ReLU(name=f"relu_{layer_number}")(x)
+            # x = tf.keras.layers.LeakyReLU(name=f"lrelu_{layer_number}")(x)
             x = tf.keras.layers.BatchNormalization(name=f"bn_{layer_number}")(x)
 
         # Final Block
         self._shape_before_bottleneck = K.int_shape(x)[1:]
+        print(self._shape_before_bottleneck)
         flatten = tf.keras.layers.Flatten()(x)
         self.mean = tf.keras.layers.Dense(self.latent_space_dim, name='mean')(flatten)
         self.log_var = tf.keras.layers.Dense(self.latent_space_dim, name='log_var')(flatten)
 
+        @tf.function
         def sample_point_from_normal_distribution(args):
             mu, log_variance = args
             epsilon = K.random_normal(shape=K.shape(self.mean), mean=0., stddev=1.)
             sampled_point = mu + K.exp(log_variance / 2) * epsilon
-            return sampled_point
+            return tf.convert_to_tensor(sampled_point)
 
-        output = tf.keras.layers.Lambda(sample_point_from_normal_distribution, name="lambda")([self.mean, self.log_var])
+        output = tf.keras.layers.Lambda(function=sample_point_from_normal_distribution, name="lambda")([self.mean, self.log_var])
         self.encoder = tf.keras.Model(encoder_input, output, name="Encoder")
 
     def _build_decoder(self):
         num_neurons = np.prod(self._shape_before_bottleneck)
-
+ 
         decoder_input = tf.keras.Input(shape=self.latent_space_dim, name='input_layer')
         dense_layer = tf.keras.layers.Dense(num_neurons, name="dense_1")(decoder_input)
         x = tf.keras.layers.Reshape(self._shape_before_bottleneck, name='Reshape')(dense_layer)
@@ -191,12 +197,12 @@ class VAE:
                 padding="same",
                 name=f"conv_transpose_{layer_num}"
             )(x)
-            # x = layers.ReLU(name=f"relu_{layer_num}")(x)
-            x = tf.keras.layers.LeakyReLU(name=f"lrelu_{layer_num}")(x)
+            x = tf.keras.layers.ReLU(name=f"relu_{layer_num}")(x)
+            # x = tf.keras.layers.LeakyReLU(name=f"lrelu_{layer_num}")(x)
             x = tf.keras.layers.BatchNormalization(name=f"bn_{layer_num}")(x)
 
         output = tf.keras.layers.Conv3DTranspose(
-            filters=self.input_shape[2],
+            filters=self.input_shape[3],
             kernel_size=self.conv_kernels[0],
             strides=self.conv_strides[0],
             padding="same",
@@ -289,6 +295,30 @@ def load_selfmotion(share=100):
 
     return x_train, y_train, x_test, y_test
 
+def load_selfmotion_vids(target_size, share=100):
+    print("loading Dataset...")
+    file_list = glob.glob('E:\Datasets\selfmotion_vids\*mp4')
+    random.shuffle(file_list)
+    num_images_to_load = round(len(file_list) * share / 100)
+    print(f"#samples:  {num_images_to_load}")
+
+    x_train = np.empty(shape=(num_images_to_load, 9, target_size[0], target_size[1], 3))
+    for n in range(0, num_images_to_load):
+        reader = imageio.get_reader(file_list[n])
+        vid = np.array([img for img in reader])
+        # image_arr = image_arr[ymin:ymin+h, xmin:xmin+w]
+        x_train[n, :, :, :, :] = tf.compat.v1.Session().run(tf.image.resize(vid,(target_size[0], target_size[1]))).astype("float32")/255.
+
+    # x_train = np.array([np.array(Image.open(fname).resize((256,256))) for fname in file_list[0:num_images_to_load-1]])
+    # x_train = x_train.astype("float32") / 255
+    # x_train = np.mean(x_train, axis=3)
+    # x_train = x_train.reshape(x_train.shape + (1,))
+
+    y_train, x_test, y_test = (np.array(range(len(x_train))), x_train, np.array(range(len(x_train))))
+
+    return x_train, y_train, x_test, y_test
+
+
 
 
 if __name__ == "__main__":
@@ -299,11 +329,12 @@ if __name__ == "__main__":
     img_height, img_width = 256, 256
     batch_size = 16
 
+    x_train, _, _, _ = load_selfmotion_vids([img_height, img_width], 5)
 
-    path = "E:\\Datasets\\selfmotion_vids"
-    files = [os.path.join(path,fn) for fn in os.listdir(path)]
-    df = pd.DataFrame(files, columns=["filepath"])
-    train_data = CustomDataGen(df, batch_size)
+    # path = "E:\\Datasets\\selfmotion_vids"
+    # files = [os.path.join(path,fn) for fn in os.listdir(path)]
+    # df = pd.DataFrame(files, columns=["filepath"])
+    # train_data = CustomDataGen(df, batch_size, input_size=(img_height, img_width))
 
     vae = VAE(
         input_shape=(9, img_height, img_width, 3),
@@ -316,8 +347,8 @@ if __name__ == "__main__":
     vae.summary()
     vae.compile()
     
-    # vae.train(train_ds, val_ds, 10, checkpoint_interval=1)
-    vae.train2(train_data, num_epochs=10)
+    vae.train(x_train, batch_size, num_epochs=10, checkpoint_interval=1)
+    # vae.train2(train_data, num_epochs=10)
     # vae.save("vae_sm2")
     pass
 

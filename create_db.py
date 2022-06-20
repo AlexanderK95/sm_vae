@@ -5,7 +5,7 @@ import tensorflow as tf
 import pandas as pd
 import os
 
-tf.compat.v1.disable_eager_execution()
+# tf.compat.v1.disable_eager_execution()
 class CustomDataGen(tf.keras.utils.Sequence):
     
     def __init__(self, df,
@@ -31,7 +31,7 @@ class CustomDataGen(tf.keras.utils.Sequence):
     def __getitem__(self, index):
         batches = self.df[index * self.batch_size:(index + 1) * self.batch_size]
         X = self.__get_data(batches)        
-        return X
+        return X, X
     
     def __len__(self):
         return self.n // self.batch_size
@@ -43,7 +43,7 @@ class CustomDataGen(tf.keras.utils.Sequence):
         vid = np.array([img for img in reader])
 
         # image_arr = image_arr[ymin:ymin+h, xmin:xmin+w]
-        vid_arr = tf.image.resize(vid,(target_size[0], target_size[1])).numpy()
+        vid_arr = tf.compat.v1.Session().run(tf.image.resize(vid,(target_size[0], target_size[1])))
 
         return vid_arr.astype("float32")/255.
 
@@ -59,17 +59,17 @@ class CustomDataGen(tf.keras.utils.Sequence):
    
 
 
-if __name__ == "__main__":
+# if __name__ == "__main__":
 
-    path = "E:\\Datasets\\vid_test"
-    files = [os.path.join(path,fn) for fn in os.listdir(path)]
-    df = pd.DataFrame(files, columns=["filepath"])
+#     path = "E:\\Datasets\\vid_test"
+#     files = [os.path.join(path,fn) for fn in os.listdir(path)]
+#     df = pd.DataFrame(files, columns=["filepath"])
 
-    datagen = CustomDataGen(df, batch_size=2)
+#     datagen = CustomDataGen(df, batch_size=2)
 
-    test = datagen[0]
+#     test = datagen[0]
 
-    pass
+#     pass
 
 
 
