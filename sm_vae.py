@@ -16,6 +16,9 @@ import math
 from PIL import Image
 import glob
 import random
+import skvideo
+skvideo.setFFmpegPath('/home/kressal/.conda/envs/tf/bin')
+import skvideo.io
 
 # from create_db import CustomDataGen
 
@@ -51,7 +54,13 @@ class VAE:
 
     @classmethod
     def load(cls, save_folder="."):
-        pass
+        parameters_path = os.path.join(save_folder, "parameters.pkl")
+        with open(parameters_path, "rb") as f:
+            parameters = pickle.load(f)
+        autoencoder = VAE(*parameters)
+        weights_path = os.path.join(save_folder, "weights.h5")
+        autoencoder.load_weights(weights_path)
+        return autoencoder
 
     def load_dataset(self):
         pass
@@ -89,8 +98,8 @@ class VAE:
         model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
             filepath="tmp/checkpoints/",
             monitor='loss',
-            verbose = 1,
-            save_best_only=True,
+            verbose = 2,
+            # save_best_only=True,
             save_weights_only=True,
             mode='min',
             save_freq = 'epoch',
@@ -107,7 +116,7 @@ class VAE:
             shuffle=True,
             callbacks=[
                 self.tensorboard_callback,
-                early_stopping_callback,
+                # early_stopping_callback,
                 model_checkpoint_callback,
                 tf.keras.callbacks.LearningRateScheduler(lambda epoch: 0.0001 * math.exp(-0.001*epoch))
             ]
@@ -224,7 +233,7 @@ class VAE:
         return combined_loss
 
     def _mse_loss(self, y_true, y_pred):
-        r_loss = K.mean(K.square(y_true - y_pred), axis = [1,2,3])
+        r_loss = K.mean(K.square(y_true - y_pred), axis = [1,2,3,4])
         return r_loss
 
     def _kl_loss(self, y_true, y_pred):
@@ -255,31 +264,6 @@ class VAE:
 
 
 
-
-
-
-# def generate_and_save_images(model, epoch, test_input):
-#   # Notice `training` is set to False.
-#   # This is so all layers run in inference mode (batchnorm).
-#     mean, var = enc(test_input, training=False)
-#     latent = final([mean, var])
-#     predictions = dec(latent, training=False)
-#     print(predictions.shape)
-#     fig = plt.figure(figsize=(4,4))
-
-#     for i in range(predictions.shape[0]):
-#         plt.subplot(5, 5, i+1)
-#         pred = predictions[i, :, :, :] * 255
-#         pred = np.array(pred)
-#         pred = pred.astype(np.uint8)
-#         #cv2.imwrite('tf_ae/images/image'+ str(i)+'.png',pred)
-
-#         plt.imshow(pred)
-#         plt.axis('off')
-
-#     plt.savefig('tf_vae/scene_imgs/images/image_at_epoch_{:d}.png'.format(epoch))
-#     plt.show()
-
 def load_selfmotion(share=100):
     print("loading Dataset...")
     file_list = glob.glob('E:\Datasets\selfmotion_imgs\dump\*jpg')
@@ -295,28 +279,27 @@ def load_selfmotion(share=100):
 
     return x_train, y_train, x_test, y_test
 
+
 def load_selfmotion_vids(target_size, share=100):
     print("loading Dataset...")
-    file_list = glob.glob('E:\Datasets\selfmotion_vids\*mp4')
+    file_list = glob.glob('/home/kressal/datasets/selfmotion_vids/*mp4')
     random.shuffle(file_list)
     num_images_to_load = round(len(file_list) * share / 100)
     print(f"#samples:  {num_images_to_load}")
 
-    x_train = np.empty(shape=(num_images_to_load, 9, target_size[0], target_size[1], 3))
+    # sess = tf.compat.v1.Session()
+
+    x_train = np.empty(shape=(num_images_to_load, 8, target_size[0], target_size[1], 3))
     for n in range(0, num_images_to_load):
-        reader = imageio.get_reader(file_list[n])
-        vid = np.array([img for img in reader])
+        print(f"processing sample {n}/{num_images_to_load-1}")
+        # reader = imageio.get_reader(file_list[n])
+        # vid = np.array([img for img in reader])
         # image_arr = image_arr[ymin:ymin+h, xmin:xmin+w]
-        x_train[n, :, :, :, :] = tf.compat.v1.Session().run(tf.image.resize(vid,(target_size[0], target_size[1]))).astype("float32")/255.
+        x_train[n, :, :, :, :] = skvideo.io.vread(file_list[n], height=target_size[0], width=target_size[1])[0:8,:,:,:]/255.
 
-    # x_train = np.array([np.array(Image.open(fname).resize((256,256))) for fname in file_list[0:num_images_to_load-1]])
-    # x_train = x_train.astype("float32") / 255
-    # x_train = np.mean(x_train, axis=3)
-    # x_train = x_train.reshape(x_train.shape + (1,))
+    # x_train = np.mean(x_train, axis=4)
 
-    y_train, x_test, y_test = (np.array(range(len(x_train))), x_train, np.array(range(len(x_train))))
-
-    return x_train, y_train, x_test, y_test
+    return x_train
 
 
 
@@ -327,9 +310,9 @@ if __name__ == "__main__":
     print("running main...")
 
     img_height, img_width = 256, 256
-    batch_size = 16
+    batch_size = 18
 
-    x_train, _, _, _ = load_selfmotion_vids([img_height, img_width], 5)
+    x_train = load_selfmotion_vids([img_height, img_width], 100)
 
     # path = "E:\\Datasets\\selfmotion_vids"
     # files = [os.path.join(path,fn) for fn in os.listdir(path)]
@@ -337,18 +320,18 @@ if __name__ == "__main__":
     # train_data = CustomDataGen(df, batch_size, input_size=(img_height, img_width))
 
     vae = VAE(
-        input_shape=(9, img_height, img_width, 3),
+        input_shape=(8, img_height, img_width, 3),
         conv_filters=(64, 128, 64, 64, 32),
         conv_kernels=(4, 4, 3, 3, 4),
-        conv_strides=(2, 2, 2, 2, 2),
-        latent_space_dim=200
+        conv_strides=(2, 2, 2, 1, 1),
+        latent_space_dim=420
     )
 
     vae.summary()
     vae.compile()
     
-    vae.train(x_train, batch_size, num_epochs=10, checkpoint_interval=1)
+    vae.train(x_train, batch_size, num_epochs=1000, checkpoint_interval=100)
     # vae.train2(train_data, num_epochs=10)
-    # vae.save("vae_sm2")
+    vae.save("vae_sm_vid")
     pass
 
