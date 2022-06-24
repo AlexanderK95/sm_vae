@@ -68,10 +68,9 @@ class VAE:
         pass
 
     def save(self, save_folder="."):
-        prefix = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
         self._create_folder_if_it_doesnt_exist(save_folder)
-        self._save_parameters(save_folder, prefix)
-        self._save_weights(save_folder, prefix)
+        self._save_parameters(save_folder)
+        self._save_weights(save_folder)
 
     def load_weights(self, weights_path):
         self.model.load_weights(weights_path)
@@ -99,7 +98,7 @@ class VAE:
     def train(self, train_ds, batch_size, num_epochs, checkpoint_interval=50):
         
         model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
-            filepath="tmp/checkpoints/weights.{epoch:02d}-{loss:.2f}.hdf5",
+            filepath="tmp/checkpoints/",
             monitor='loss',
             verbose = 2,
             # save_best_only=True,
@@ -128,7 +127,7 @@ class VAE:
     def train2(self, train_ds, num_epochs, checkpoint_interval=50):
         
         model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
-            filepath="tmp/checkpoints/weights.{epoch:02d}-{loss:.2f}.hdf5",
+            filepath="tmp/checkpoints/",
             monitor='loss',
             verbose = 1,
             save_best_only=True,
@@ -165,7 +164,7 @@ class VAE:
         # Convolution blocks (conv layers + (leaky) ReLU + Batch norm)
         for layer_index in range(self._num_conv_layers):
             layer_number = layer_index + 1
-            x = tf.keras.layers.Conv3D(
+            x = tf.keras.layers.Conv2D(
                 filters=self.conv_filters[layer_index],
                 kernel_size=self.conv_kernels[layer_index],
                 strides=self.conv_strides[layer_index],
@@ -202,7 +201,7 @@ class VAE:
 
         for layer_index in reversed(range(1, self._num_conv_layers)):
             layer_num = self._num_conv_layers - layer_index
-            x = tf.keras.layers.Conv3DTranspose(
+            x = tf.keras.layers.Conv2DTranspose(
                 filters=self.conv_filters[layer_index],
                 kernel_size=self.conv_kernels[layer_index],
                 strides=self.conv_strides[layer_index],
@@ -213,7 +212,7 @@ class VAE:
             # x = tf.keras.layers.LeakyReLU(name=f"lrelu_{layer_num}")(x)
             x = tf.keras.layers.BatchNormalization(name=f"bn_{layer_num}")(x)
 
-        output = tf.keras.layers.Conv3DTranspose(
+        output = tf.keras.layers.Conv2DTranspose(
             filters=self.input_shape[3],
             kernel_size=self.conv_kernels[0],
             strides=self.conv_strides[0],
@@ -247,7 +246,7 @@ class VAE:
         if not os.path.exists(folder):
             os.makedirs(folder)
 
-    def _save_parameters(self, save_folder, prefix):
+    def _save_parameters(self, save_folder):
         parameters = [
             self.input_shape,
             self.conv_filters,
@@ -255,12 +254,12 @@ class VAE:
             self.conv_strides,
             self.latent_space_dim
         ]
-        save_path = os.path.join(save_folder, f"{prefix}_parameters.pkl")
+        save_path = os.path.join(save_folder, "parameters.pkl")
         with open(save_path, "wb") as f:
             pickle.dump(parameters, f)
 
-    def _save_weights(self, save_folder, prefix):
-        save_path = os.path.join(save_folder, f"{prefix}_weights.h5")
+    def _save_weights(self, save_folder):
+        save_path = os.path.join(save_folder, "weights.h5")
         self.model.save_weights(save_path)
 
 
@@ -272,9 +271,10 @@ if __name__ == "__main__":
     print("running main...")
 
     img_height, img_width = 256, 256
-    batch_size = 64
+    batch_size = 18
 
-    x_train = dl.load_selfmotion_vids([img_height, img_width], 100, True)
+    x_train = dl.load_selfmotion_vids([img_height, img_width], 5, True)
+    print(x_train.shape)
 
     # path = "E:\\Datasets\\selfmotion_vids"
     # files = [os.path.join(path,fn) for fn in os.listdir(path)]
@@ -283,8 +283,8 @@ if __name__ == "__main__":
 
     vae = VAE(
         input_shape=(x_train.shape[1:]),
-        conv_filters=(64, 64, 64, 32, 16),
-        conv_kernels=(4, 2, 3, 3, 4),
+        conv_filters=(64, 128, 64, 64, 32),
+        conv_kernels=(4, 4, 3, 3, 4),
         conv_strides=(2, 2, 2, 1, 1),
         latent_space_dim=420
     )
@@ -292,8 +292,8 @@ if __name__ == "__main__":
     vae.summary()
     vae.compile()
     
-    vae.train(x_train, batch_size, num_epochs=1000, checkpoint_interval=100)
-    # vae.train2(train_data, num_epochs=10)
-    vae.save("vae_sm_vid")
-    pass
+    # vae.train(x_train, batch_size, num_epochs=1000, checkpoint_interval=100)
+    # # vae.train2(train_data, num_epochs=10)
+    # vae.save("vae_sm_vid_c2")
+    # pass
 
