@@ -33,7 +33,7 @@ def load_selfmotion_vids(target_size, share=100, bw=False):
 
     x_train = np.empty(shape=(num_images_to_load, 8, target_size[0], target_size[1], 3)) if not bw else np.empty(shape=(num_images_to_load, 8, target_size[0], target_size[1]))
     for n in range(0, num_images_to_load):
-        print(f"processing sample {n}/{num_images_to_load-1}")
+        # print(f"processing sample {n}/{num_images_to_load-1}")
         # reader = imageio.get_reader(file_list[n])
         # vid = np.array([img for img in reader])
         # image_arr = image_arr[ymin:ymin+h, xmin:xmin+w]

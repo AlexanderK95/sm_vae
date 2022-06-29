@@ -64,9 +64,6 @@ class VAE:
         autoencoder.load_weights(weights_path)
         return autoencoder
 
-    def load_dataset(self):
-        pass
-
     def save(self, save_folder="."):
         prefix = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
         self._create_folder_if_it_doesnt_exist(save_folder)
@@ -86,20 +83,27 @@ class VAE:
         self.decoder.summary()
         self.model.summary()
 
-    def compile(self, learning_rate=0.0001):
+    def compile(self, reconstruction_loss="mse", reconstruction_weight=1000, learning_rate=0.0001):
+        self._reconstruction_loss = reconstruction_loss
+        self.reconstruction_loss_weight = reconstruction_weight
         # optimizer = Adam(learning_rate=learning_rate)
+        if reconstruction_loss == "mse": rl = self._mse_loss
+        elif reconstruction_loss == "psnr": rl = self._psnr_loss
+        elif reconstruction_loss == "ssmi": rl = self._ssmi_loss
+        else: raise Exception("Invalid loss function")
+
         optimizer = tf.optimizers.Adam(learning_rate=learning_rate)
         self.model.compile(
             optimizer=optimizer,
             loss=self._combined_loss,
-            metrics=[self._mse_loss,
+            metrics=[rl,
                     self._kl_loss])
 
 
     def train(self, train_ds, batch_size, num_epochs, checkpoint_interval=50):
         
         model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
-            filepath="tmp/checkpoints/weights.{epoch:02d}-{loss:.2f}.hdf5",
+            filepath="tmp/checkpoints/weights.{epoch:02d}-{loss:.2f}_{self._reconstruction_loss}.hdf5",
             monitor='loss',
             verbose = 2,
             # save_best_only=True,
@@ -108,7 +112,7 @@ class VAE:
             save_freq = 'epoch',
             period = checkpoint_interval)
         early_stopping_callback = tf.keras.callbacks.EarlyStopping(monitor='loss')
-        self.log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        self.log_dir = f"logs/fit/{self._reconstruction_loss}_" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
         self.tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=self.log_dir, histogram_freq=1)
         self.model.fit(
             train_ds,
@@ -230,13 +234,29 @@ class VAE:
         self.model = tf.keras.Model(model_input, model_output, name="VAE")
 
     def _combined_loss(self, y_true, y_pred):
-        reconstruction_loss = self._mse_loss(y_true, y_pred)
+
+        if self._reconstruction_loss == "mse": reconstruction_loss = self._mse_loss(y_true, y_pred)
+        elif self._reconstruction_loss == "psnr": reconstruction_loss = self._psnr_loss(y_true, y_pred)
+        elif self._reconstruction_loss == "ssmi": reconstruction_loss = self._ssmi_loss(y_true, y_pred)
+        else: raise Exception("Invalid loss function")
+
         kl_loss = self._kl_loss(y_true, y_pred)
         combined_loss = self.reconstruction_loss_weight * reconstruction_loss + kl_loss
         return combined_loss
 
     def _mse_loss(self, y_true, y_pred):
         r_loss = K.mean(K.square(y_true - y_pred), axis = [1,2,3,4])
+        return r_loss
+
+    def _psnr_loss(self, y_true, y_pred):
+        mse = self._mse_loss(y_true, y_pred)
+        max = K.max(y_true, axis=None)
+        r_loss = 20*tf.experimental.numpy.log10(max) + 10*tf.experimental.numpy.log10(mse)
+        return K.abs(r_loss)
+
+    def _ssmi_loss(self, y_true, y_pred):
+        ssmi = tf.image.ssim(y_true,y_pred, 1)
+        r_loss = K.max(ssmi, axis=None)
         return r_loss
 
     def _kl_loss(self, y_true, y_pred):
@@ -266,34 +286,34 @@ class VAE:
 
 
 
-if __name__ == "__main__":
+# if __name__ == "__main__":
     
-    print(tf.__version__)
-    print("running main...")
+#     print(tf.__version__)
+#     print("running main...")
 
-    img_height, img_width = 256, 256
-    batch_size = 64
+#     img_height, img_width = 256, 256
+#     batch_size = 64
 
-    x_train = dl.load_selfmotion_vids([img_height, img_width], 100, True)
+#     x_train = dl.load_selfmotion_vids([img_height, img_width], 100, True)
 
-    # path = "E:\\Datasets\\selfmotion_vids"
-    # files = [os.path.join(path,fn) for fn in os.listdir(path)]
-    # df = pd.DataFrame(files, columns=["filepath"])
-    # train_data = CustomDataGen(df, batch_size, input_size=(img_height, img_width))
+#     # path = "E:\\Datasets\\selfmotion_vids"
+#     # files = [os.path.join(path,fn) for fn in os.listdir(path)]
+#     # df = pd.DataFrame(files, columns=["filepath"])
+#     # train_data = CustomDataGen(df, batch_size, input_size=(img_height, img_width))
 
-    vae = VAE(
-        input_shape=(x_train.shape[1:]),
-        conv_filters=(64, 64, 64, 32, 16),
-        conv_kernels=(4, 2, 3, 3, 4),
-        conv_strides=(2, 2, 2, 1, 1),
-        latent_space_dim=420
-    )
+#     vae = VAE(
+#         input_shape=(x_train.shape[1:]),
+#         conv_filters=(64, 64, 64, 32, 16),
+#         conv_kernels=(4, 2, 3, 3, 4),
+#         conv_strides=(2, 2, 2, 1, 1),
+#         latent_space_dim=420
+#     )
 
-    vae.summary()
-    vae.compile()
+#     vae.summary()
+#     vae.compile()
     
-    vae.train(x_train, batch_size, num_epochs=1000, checkpoint_interval=100)
-    # vae.train2(train_data, num_epochs=10)
-    vae.save("vae_sm_vid")
-    pass
+#     vae.train(x_train, batch_size, num_epochs=1000, checkpoint_interval=100)
+#     # vae.train2(train_data, num_epochs=10)
+#     vae.save("vae_sm_vid")
+#     pass
 

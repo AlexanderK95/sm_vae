@@ -109,15 +109,15 @@ class VAE:
     def train2(self, train_ds, batch_size, num_epochs, checkpoint_interval=50):
         
         model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
-            filepath="tmp/checkpoints/",
+            filepath="./tmp/checkpoints/",
             monitor='loss',
             verbose = 1,
-            save_best_only=True,
+            save_best_only=False,
             save_weights_only=True,
             mode='min',
             save_freq = 'epoch',
             period = checkpoint_interval)
-        self.log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        self.log_dir = "./logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
         self.tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=self.log_dir, histogram_freq=1)
         self.model.fit(
             train_ds,
@@ -281,8 +281,8 @@ def load_selfmotion(share=100):
     print(f"#samples:  {num_images_to_load}")
     x_train = np.array([np.array(Image.open(fname).resize((256,256))) for fname in file_list[0:num_images_to_load-1]])
     x_train = x_train.astype("float32") / 255
-    x_train = np.mean(x_train, axis=3)
-    x_train = x_train.reshape(x_train.shape + (1,))
+    # x_train = np.mean(x_train, axis=3)
+    # x_train = x_train.reshape(x_train.shape + (1,))
 
     y_train, x_test, y_test = (np.array(range(len(x_train))), x_train, np.array(range(len(x_train))))
 
@@ -294,7 +294,7 @@ if __name__ == "__main__":
     print("running main...")
 
     img_height, img_width = 256, 256
-    batch_size = 16
+    batch_size = 256
 
 
     # train_ds = tf.keras.preprocessing.image_dataset_from_directory(
@@ -334,20 +334,20 @@ if __name__ == "__main__":
     # train_ds = train_ds.cache().shuffle(1000).prefetch(buffer_size=AUTOTUNE)
     # val_ds = val_ds.cache().prefetch(buffer_size=AUTOTUNE)
 
-    x_train, _, _, _ = load_selfmotion(1)
+    x_train, _, _, _ = load_selfmotion(50)
 
     vae = VAE(
-        input_shape=(img_height, img_width, 1),
-        conv_filters=(64, 128, 64, 64, 32),
-        conv_kernels=(4, 4, 3, 3, 4),
+        input_shape=(img_height, img_width, 3),
+        conv_filters=(32, 64, 64, 64, 64),
+        conv_kernels=(2, 3, 3, 3, 3),
         conv_strides=(2, 2, 2, 2, 2),
         latent_space_dim=200
     )
     # vae.summary()
     vae.compile()
     # vae.train(train_ds, val_ds, 10, checkpoint_interval=1)
-    vae.train2(x_train, batch_size, 10)
-    # vae.save("vae_sm2")
+    vae.train2(x_train, batch_size, 1000)
+    vae.save("vae_sm2")
     # pass
 
     # plt.figure(figsize=(10, 10))

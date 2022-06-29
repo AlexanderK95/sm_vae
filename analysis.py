@@ -3,9 +3,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 import tensorflow as tf
 import skvideo.io
-from sm_vae import VAE, load_selfmotion_vids
+from dataloader import load_selfmotion_vids
+from sm_vae import VAE
+from sm_vae_c2 import VAE as VAE_c2
 import os
 from sklearn.manifold import TSNE
+import argparse
 
 
 # os.environ['CUDA_VISIBLE_DEVICES'] = '0'
@@ -68,46 +71,63 @@ def save_video(fname, video):
     skvideo.io.vwrite(fname, video)
 
 if __name__ == "__main__":
-    autoencoder = VAE.load("vae_sm_vid")
+
+    parser = argparse.ArgumentParser(description='Training parameters')
+
+    parser.add_argument('--model', help='folder containing parameters and weights of the model')
+    parser.add_argument('--out', help='name for output files')
+
+    args = parser.parse_args()
+
+    autoencoder = VAE.load(args.model)
+    # autoencoder_c2 = VAE_c2.load("vae_sm_vid_c2")
     autoencoder.summary()
+    # autoencoder_c2.summary()
 
     img_height, img_width = 256, 256
-    x_test = load_selfmotion_vids([img_height, img_width], 1)
+    x_test = load_selfmotion_vids([img_height, img_width], 5, True)
     
     print("Reconstruction")
     num_sample_videos_to_show = 50
     sample_videos = select_videos(x_test, num_sample_videos_to_show)
     reconstructed_videos, latent_points = autoencoder.reconstruct(sample_videos)
+    # reconstructed_videos_c2, latent_points_c2 = autoencoder_c2.reconstruct(sample_videos)
 
     print(reconstructed_videos.shape)
     print(f"Reconstructed:  min: {np.min(reconstructed_videos[0])}      max: {np.max(reconstructed_videos[0])}      mean: {np.mean(reconstructed_videos[0])}")
     print(f"Latent Space:   min: {np.min(latent_points[0])}             max: {np.max(latent_points[0])}             mean: {np.mean(latent_points[0])}")
+    
+    # print(reconstructed_videos_c2.shape)
+    # print(f"Reconstructed:  min: {np.min(reconstructed_videos_c2[0])}      max: {np.max(reconstructed_videos_c2[0])}      mean: {np.mean(reconstructed_videos_c2[0])}")
+    # print(f"Latent Space:   min: {np.min(latent_points_c2[0])}             max: {np.max(latent_points_c2[0])}             mean: {np.mean(latent_points_c2[0])}")
 
-    save_video('test.mp4', reconstructed_videos[0]*255)
-
-
-    n_to_show = 5000
-    grid_size = 15
-    figsize = 12
-
-    latent_points[np.isfinite(latent_points)] = 3.4028235e27
-
-    tsne = TSNE(n_components=2, init='pca', random_state=0)
-    X_tsne = tsne.fit_transform(latent_points.astype("float32"))
-    min_x = min(X_tsne[:, 0])
-    max_x = max(X_tsne[:, 0])
-    min_y = min(X_tsne[:, 1])
-    max_y = max(X_tsne[:, 1])
+    save_video(f"{args.out}_recon.mp4", reconstructed_videos[0]*255)
+    save_video(f"{args.out}_original.mp4", sample_videos[0]*255)
+    # save_video('test_c2.mp4', reconstructed_videos_c2[0]*255)
 
 
-    plt.figure(figsize=(figsize, figsize))
-    plt.scatter(X_tsne[:, 0] , X_tsne[:, 1], alpha=0.5, s=2)
-    plt.xlabel("Dimension-1", size=20)
-    plt.ylabel("Dimension-2", size=20)
-    plt.xticks(size=20)
-    plt.yticks(size=20)
-    plt.title("VAE - Projection of 2D Latent-Space (artificial Set)", size=20)
-    plt.savefig("latent_representation.png")
+    # n_to_show = 5000
+    # grid_size = 15
+    # figsize = 12
+
+    # latent_points[np.isfinite(latent_points)] = 3.4028235e27
+
+    # tsne = TSNE(n_components=2, init='pca', random_state=0)
+    # X_tsne = tsne.fit_transform(latent_points.astype("float32"))
+    # min_x = min(X_tsne[:, 0])
+    # max_x = max(X_tsne[:, 0])
+    # min_y = min(X_tsne[:, 1])
+    # max_y = max(X_tsne[:, 1])
+
+
+    # plt.figure(figsize=(figsize, figsize))
+    # plt.scatter(X_tsne[:, 0] , X_tsne[:, 1], alpha=0.5, s=2)
+    # plt.xlabel("Dimension-1", size=20)
+    # plt.ylabel("Dimension-2", size=20)
+    # plt.xticks(size=20)
+    # plt.yticks(size=20)
+    # plt.title("VAE - Projection of 2D Latent-Space (artificial Set)", size=20)
+    # plt.savefig("latent_representation.png")
 
     # plot_reconstructed_videos(sample_videos, reconstructed_videos)
 
@@ -120,13 +140,13 @@ if __name__ == "__main__":
 
     print("Prediction")
     num_samples = 10
-    latent_points = np.array([[random.uniform(-4, 4) for j in range(200)] for i in range(num_samples)])
+    latent_points = np.array([[random.uniform(-4, 4) for j in range(420)] for i in range(num_samples)])
     # latent_points = np.array([random.uniform(-4, 4) for j in range(200)])
     print(latent_points.shape)
     new_videos = autoencoder.decoder.predict(latent_points)
     print(new_videos.shape)
     print(f"Predicted:      min: {np.min(new_videos[0])}        max: {np.max(new_videos[0])}        mean: {np.mean(new_videos[0])}")
     print(f"Latent Space:   min: {np.min(latent_points[0])}     max: {np.max(latent_points[0])}     mean: {np.mean(latent_points[0])}")
-    save_video("pred_test.mp4", new_videos[0]*255)
+    save_video(f"{args.out}_pred.mp4", new_videos[0]*255)
 
 
