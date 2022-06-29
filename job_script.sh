@@ -1,8 +1,8 @@
 #!/bin/bash
 
 #SBATCH --ntasks 1
-#SBATCH --cpus-per-task 6
-#SBATCH --mem-per-cpu=2024
+#SBATCH --cpus-per-task 12
+#SBATCH --mem-per-cpu=4094
 #SBATCH --time 03:00:00
 #SBATCH --gpus=1
 
@@ -14,9 +14,9 @@
 ##SBATCH --array 1-20
 # This is a job Array of 20 jobs
 
-#SBATCH --job-name vae_train_ssmi
+#SBATCH --job-name vae_train_psnr
 # A name for this job to be displayed in the queue
-#SBATCH --output job_logs/vae_train_ssmi_job_%A_%a.out
+#SBATCH --output job_logs/vae_train_psnr_job_%A_%a.out
 # filename where the terminal output pf this job goes
 
 #here the jobscript starts
@@ -46,7 +46,7 @@ conda install ffmpeg
 echo "running python script..."
 
 # python3 train.py
-python train.py --batch-size 64 --epochs 1000 --dataset-size 100 --grayscale False --recon-loss ssmi --recon-weight 10000000
+python train.py --batch-size 64 --epochs 1000 --dataset-size 100 --grayscale False --recon-loss psnr --recon-weight 1
 # python3 sm_vae_c2.py
 # python3 analysis.py
 

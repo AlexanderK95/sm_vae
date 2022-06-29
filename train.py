@@ -1,6 +1,9 @@
 from sm_vae import VAE
 from dataloader import load_selfmotion_vids
 import argparse
+import pandas as pd
+from create_db import CustomDataGen
+import os
 
 
 
@@ -29,10 +32,12 @@ if __name__ == "__main__":
 
     x_train = load_selfmotion_vids([img_height, img_width], dataset_size, bw)
 
-    # path = "E:\\Datasets\\selfmotion_vids"
+    # path = "/home/kressal/datasets/selfmotion_vids"
     # files = [os.path.join(path,fn) for fn in os.listdir(path)]
     # df = pd.DataFrame(files, columns=["filepath"])
     # train_data = CustomDataGen(df, batch_size, input_size=(img_height, img_width))
+
+    # print(train_data.input_shape())
 
     vae = VAE(
         input_shape=(x_train.shape[1:]),
@@ -42,11 +47,19 @@ if __name__ == "__main__":
         latent_space_dim=420
     )
 
+    # vae = VAE(
+    #     input_shape=train_data.input_shape(),
+    #     conv_filters=(64, 64, 64, 32, 16),
+    #     conv_kernels=([2,27,45], [2,2,2], [2,3,3], [2,3,3], [2,4,4]),
+    #     conv_strides=([1,9,15], [1,2,2], [2,2,2], [1,2,2], [1,1,1]),
+    #     latent_space_dim=420
+    # )
+
     vae.summary()
     vae.compile(reconstruction_loss=rl, reconstruction_weight=rlw)
     
     vae.train(x_train, batch_size, num_epochs=epochs, checkpoint_interval=100)
-    # vae.train2(train_data, num_epochs=10)
+    # vae.train2(train_data, num_epochs=epochs, checkpoint_interval=int(epochs/10))
 
     grayscale = "bw" if bw else "color"
     vae.save(f"vae_sm_vid_{bw}_{rl}")

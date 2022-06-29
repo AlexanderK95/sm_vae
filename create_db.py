@@ -11,6 +11,8 @@ class CustomDataGen(tf.keras.utils.Sequence):
     def __init__(self, df,
                  batch_size,
                  input_size=(512, 512),
+                 img_count=8,
+                 grayscale=False,
                  shuffle=True):
         
         self.df = df.copy()
@@ -18,6 +20,8 @@ class CustomDataGen(tf.keras.utils.Sequence):
         # self.y_col = y_col
         self.batch_size = batch_size
         self.input_size = input_size
+        self.img_count = img_count
+        self.grayscale = grayscale
         self.shuffle = shuffle
         
         self.n = len(self.df)
@@ -27,10 +31,13 @@ class CustomDataGen(tf.keras.utils.Sequence):
     def on_epoch_end(self):
         if self.shuffle:
             self.df = self.df.sample(frac=1).reset_index(drop=True)
+
+    def input_shape(self):
+        return (self.img_count, self.input_size[0], self.input_size[1], 3)
     
     def __getitem__(self, index):
         batches = self.df[index * self.batch_size:(index + 1) * self.batch_size]
-        X = self.__get_data(batches)        
+        X = self.__get_data(batches)
         return X, X
     
     def __len__(self):
@@ -40,12 +47,18 @@ class CustomDataGen(tf.keras.utils.Sequence):
     def __get_input(self, path, target_size):
 
         reader = imageio.get_reader(path[0])
-        vid = np.array([img for img in reader])
+        cnt = 0
+        vid = np.empty(shape=(self.img_count, target_size[0], target_size[1], 3)).astype("float32") if not self.grayscale else np.empty(shape=(self.img_count, 8, target_size[0], target_size[1])).astype("float32")
+        for img in reader:
+            if cnt < self.img_count:
+                vid[cnt,:,:,:] = np.array(img)
+                cnt += 1
 
         # image_arr = image_arr[ymin:ymin+h, xmin:xmin+w]
-        vid_arr = tf.compat.v1.Session().run(tf.image.resize(vid,(target_size[0], target_size[1])))
-
-        return vid_arr.astype("float32")/255.
+        # vid_arr = tf.compat.v1.Session().run(tf.image.resize(vid,(target_size[0], target_size[1])))
+        # vid_arr = tf.image.resize(vid,(target_size[0], target_size[1]))
+        # print(vid.shape)
+        return vid/255.
 
     def __get_data(self, batches):
         # Generates data containing batch_size samples
