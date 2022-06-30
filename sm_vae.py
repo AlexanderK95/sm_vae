@@ -100,19 +100,21 @@ class VAE:
                     self._kl_loss])
 
 
-    def train(self, train_ds, batch_size, num_epochs, checkpoint_interval=50):
+    def train(self, train_ds, batch_size, num_epochs, grayscale, checkpoint_interval=50):
+
+        bw = "gray" if grayscale else "color"
         
         model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
-            filepath="tmp/checkpoints/weights.{epoch:02d}-{loss:.2f}_{self._reconstruction_loss}.hdf5",
+            filepath="tmp/checkpoints/weights.{epoch:02d}-{loss:.2f}_"+self._reconstruction_loss+".hdf5",
             monitor='loss',
             verbose = 2,
             # save_best_only=True,
             save_weights_only=True,
-            mode='min',
-            save_freq = 'epoch',
+            # mode='min',
+            save_freq = 1500,
             period = checkpoint_interval)
         early_stopping_callback = tf.keras.callbacks.EarlyStopping(monitor='loss')
-        self.log_dir = f"logs/fit/{self._reconstruction_loss}_" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        self.log_dir = f"logs/fit/{self._reconstruction_loss}_{bw}_" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
         self.tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=self.log_dir, histogram_freq=1)
         self.model.fit(
             train_ds,
@@ -132,7 +134,7 @@ class VAE:
     def train2(self, train_ds, num_epochs, checkpoint_interval=50):
         
         model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
-            filepath="tmp/checkpoints/weights.{epoch:02d}-{loss:.2f}_{self._reconstruction_loss}.hdf5",
+            filepath="tmp/checkpoints/weights.{epoch:02d}-{loss:.2f}_"+self._reconstruction_loss+".hdf5",
             monitor='loss',
             verbose = 2,
             # save_best_only=True,

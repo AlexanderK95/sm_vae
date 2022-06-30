@@ -39,11 +39,19 @@ if __name__ == "__main__":
 
     # print(train_data.input_shape())
 
+    # vae = VAE(
+    #     input_shape=(x_train.shape[1:]),
+    #     conv_filters=(64, 64, 64, 32, 16),
+    #     conv_kernels=(4, 2, 3, 3, 4),
+    #     conv_strides=(2, 2, 2, 1, 1),
+    #     latent_space_dim=420
+    # )
+    
     vae = VAE(
         input_shape=(x_train.shape[1:]),
         conv_filters=(64, 64, 64, 32, 16),
-        conv_kernels=(4, 2, 3, 3, 4),
-        conv_strides=(2, 2, 2, 1, 1),
+        conv_kernels=([2,5,5], [2,4,4], [2,3,3], [2,3,3], [2,3,3]),
+        conv_strides=([1,2,2], [1,2,2], [2,2,2], [2,2,2], [2,1,1]),
         latent_space_dim=420
     )
 
@@ -58,8 +66,9 @@ if __name__ == "__main__":
     vae.summary()
     vae.compile(reconstruction_loss=rl, reconstruction_weight=rlw)
     
-    vae.train(x_train, batch_size, num_epochs=epochs, checkpoint_interval=100)
+    vae.train(x_train, batch_size, num_epochs=epochs, grayscale=bw, checkpoint_interval=100)
     # vae.train2(train_data, num_epochs=epochs, checkpoint_interval=int(epochs/10))
 
     grayscale = "bw" if bw else "color"
-    vae.save(f"vae_sm_vid_{bw}_{rl}")
+
+    vae.save(f"models/batch-size_{batch_size}_epochs{epochs}_grayscale_{bw}_recon-loss_{rl}_recon-weight_{rlw}")

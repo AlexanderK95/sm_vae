@@ -76,8 +76,11 @@ if __name__ == "__main__":
 
     parser.add_argument('--model', help='folder containing parameters and weights of the model')
     parser.add_argument('--out', help='name for output files')
+    parser.add_argument('--grayscale', help='Boolean whether dataset should be loades as grayscale')
 
     args = parser.parse_args()
+
+    bw = args.grayscale == "True"
 
     autoencoder = VAE.load(args.model)
     # autoencoder_c2 = VAE_c2.load("vae_sm_vid_c2")
@@ -85,7 +88,7 @@ if __name__ == "__main__":
     # autoencoder_c2.summary()
 
     img_height, img_width = 256, 256
-    x_test = load_selfmotion_vids([img_height, img_width], 5, True)
+    x_test = load_selfmotion_vids([img_height, img_width], 5, bw)
     
     print("Reconstruction")
     num_sample_videos_to_show = 50
@@ -106,36 +109,34 @@ if __name__ == "__main__":
     # save_video('test_c2.mp4', reconstructed_videos_c2[0]*255)
 
 
-    # n_to_show = 5000
-    # grid_size = 15
-    # figsize = 12
+    n_to_show = 5000
+    grid_size = 15
+    figsize = 12
 
-    # latent_points[np.isfinite(latent_points)] = 3.4028235e27
-
-    # tsne = TSNE(n_components=2, init='pca', random_state=0)
-    # X_tsne = tsne.fit_transform(latent_points.astype("float32"))
-    # min_x = min(X_tsne[:, 0])
-    # max_x = max(X_tsne[:, 0])
-    # min_y = min(X_tsne[:, 1])
-    # max_y = max(X_tsne[:, 1])
+    tsne = TSNE(n_components=2, init='pca', random_state=0)
+    X_tsne = tsne.fit_transform(latent_points.astype("float32"))
+    min_x = min(X_tsne[:, 0])
+    max_x = max(X_tsne[:, 0])
+    min_y = min(X_tsne[:, 1])
+    max_y = max(X_tsne[:, 1])
 
 
-    # plt.figure(figsize=(figsize, figsize))
-    # plt.scatter(X_tsne[:, 0] , X_tsne[:, 1], alpha=0.5, s=2)
-    # plt.xlabel("Dimension-1", size=20)
-    # plt.ylabel("Dimension-2", size=20)
-    # plt.xticks(size=20)
-    # plt.yticks(size=20)
-    # plt.title("VAE - Projection of 2D Latent-Space (artificial Set)", size=20)
-    # plt.savefig("latent_representation.png")
+    plt.figure(figsize=(figsize, figsize))
+    plt.scatter(X_tsne[:, 0] , X_tsne[:, 1], alpha=0.5, s=2)
+    plt.xlabel("Dimension-1", size=20)
+    plt.ylabel("Dimension-2", size=20)
+    plt.xticks(size=20)
+    plt.yticks(size=20)
+    plt.title("VAE - Projection of 2D Latent-Space (artificial Set)", size=20)
+    plt.savefig(f"{args.out}_latent_representation.png")
 
-    # plot_reconstructed_videos(sample_videos, reconstructed_videos)
+    plot_reconstructed_videos(sample_videos, reconstructed_videos)
 
-    # #
-    # # # num_images = 6000
-    # # # sample_images, sample_labels = select_images(x_test, y_test, num_images)
-    # # # _, latent_representations = autoencoder.reconstruct(sample_images)
-    # # # plot_images_encoded_in_latent_space(latent_representations, sample_labels)
+    #
+    # # num_images = 6000
+    # # sample_images, sample_labels = select_images(x_test, y_test, num_images)
+    # # _, latent_representations = autoencoder.reconstruct(sample_images)
+    # # plot_images_encoded_in_latent_space(latent_representations, sample_labels)
     # #
 
     print("Prediction")
