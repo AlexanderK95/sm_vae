@@ -1,0 +1,6 @@
+--batch-size 64
+--epochs 1000
+--dataset-size 100
+--grayscale True
+--recon-loss ssmi
+--recon-weight 10000
