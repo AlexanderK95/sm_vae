@@ -4,11 +4,16 @@ import argparse
 import pandas as pd
 from create_db import CustomDataGen
 import os
+import tensorflow as tf
+import datetime
 
 
 
 
 if __name__ == "__main__":
+    # logdir = f"logs/fit/debug#
+    
+
     parser = argparse.ArgumentParser(description='Training parameters')
 
     parser.add_argument('--batch-size', help='batch size')
@@ -71,4 +76,4 @@ if __name__ == "__main__":
 
     grayscale = "bw" if bw else "color"
 
-    vae.save(f"models/batch-size_{batch_size}_epochs{epochs}_grayscale_{bw}_recon-loss_{rl}_recon-weight_{rlw}")
+    vae.save(f"models/batch-size_{batch_size}#epochs_{epochs}#grayscale_{bw}#recon-loss_{rl}#recon-weight_{rlw}")

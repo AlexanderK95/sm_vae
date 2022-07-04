@@ -3,4 +3,4 @@
 --dataset-size 100
 --grayscale True
 --recon-loss mse
---recon-weight 1000
+--recon-weight 1000000

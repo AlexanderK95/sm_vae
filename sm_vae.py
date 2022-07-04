@@ -65,7 +65,8 @@ class VAE:
         return autoencoder
 
     def save(self, save_folder="."):
-        prefix = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        # prefix = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        prefix = ""
         self._create_folder_if_it_doesnt_exist(save_folder)
         self._save_parameters(save_folder, prefix)
         self._save_weights(save_folder, prefix)

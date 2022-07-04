@@ -3,4 +3,4 @@
 --dataset-size 100
 --grayscale True
 --recon-loss psnr
---recon-weight 10
+--recon-weight 100

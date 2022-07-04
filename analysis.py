@@ -75,20 +75,27 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Training parameters')
 
     parser.add_argument('--model', help='folder containing parameters and weights of the model')
-    parser.add_argument('--out', help='name for output files')
+    # parser.add_argument('--out', help='name for output files')
     parser.add_argument('--grayscale', help='Boolean whether dataset should be loades as grayscale')
 
     args = parser.parse_args()
 
     bw = args.grayscale == "True"
+    
+    output_name = os.path.basename(args.model)
 
     autoencoder = VAE.load(args.model)
     # autoencoder_c2 = VAE_c2.load("vae_sm_vid_c2")
-    autoencoder.summary()
+    # autoencoder.summary()
     # autoencoder_c2.summary()
 
     img_height, img_width = 256, 256
     x_test = load_selfmotion_vids([img_height, img_width], 5, bw)
+
+    print("###################################################")
+    print(args.model)
+    print("###################################################")
+    print(output_name)
     
     print("Reconstruction")
     num_sample_videos_to_show = 50
@@ -104,8 +111,8 @@ if __name__ == "__main__":
     # print(f"Reconstructed:  min: {np.min(reconstructed_videos_c2[0])}      max: {np.max(reconstructed_videos_c2[0])}      mean: {np.mean(reconstructed_videos_c2[0])}")
     # print(f"Latent Space:   min: {np.min(latent_points_c2[0])}             max: {np.max(latent_points_c2[0])}             mean: {np.mean(latent_points_c2[0])}")
 
-    save_video(f"{args.out}_recon.mp4", reconstructed_videos[0]*255)
-    save_video(f"{args.out}_original.mp4", sample_videos[0]*255)
+    save_video(f"results/{output_name}_recon.mp4", reconstructed_videos[0]*255)
+    save_video(f"results/{output_name}_original.mp4", sample_videos[0]*255)
     # save_video('test_c2.mp4', reconstructed_videos_c2[0]*255)
 
 
@@ -127,8 +134,8 @@ if __name__ == "__main__":
     plt.ylabel("Dimension-2", size=20)
     plt.xticks(size=20)
     plt.yticks(size=20)
-    plt.title("VAE - Projection of 2D Latent-Space (artificial Set)", size=20)
-    plt.savefig(f"{args.out}_latent_representation.png")
+    plt.title(f"VAE - Projection of 2D Latent-Space ({output_name} artificial set)", size=20)
+    plt.savefig(f"results/{output_name}_latent_representation.png")
 
     plot_reconstructed_videos(sample_videos, reconstructed_videos)
 
@@ -148,6 +155,7 @@ if __name__ == "__main__":
     print(new_videos.shape)
     print(f"Predicted:      min: {np.min(new_videos[0])}        max: {np.max(new_videos[0])}        mean: {np.mean(new_videos[0])}")
     print(f"Latent Space:   min: {np.min(latent_points[0])}     max: {np.max(latent_points[0])}     mean: {np.mean(latent_points[0])}")
-    save_video(f"{args.out}_pred.mp4", new_videos[0]*255)
+
+    save_video(f"results/{output_name}_pred.mp4", new_videos[0]*255)
 
 
