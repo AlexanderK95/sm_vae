@@ -260,8 +260,9 @@ class VAE:
         return K.abs(r_loss)
 
     def _ssmi_loss(self, y_true, y_pred):
-        ssmi = tf.image.ssim(y_true,y_pred, 1)
-        r_loss = K.max(ssmi, axis=None)
+        ssmi = tf.image.ssim_multiscale(y_true,y_pred, 1, filter_size=5, filter_sigma=1)
+        # r_loss = K.max(ssmi, axis=None)
+        r_loss = K.mean(ssmi, axis=None)
         return r_loss
 
     def _kl_loss(self, y_true, y_pred):

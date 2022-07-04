@@ -1,4 +1,5 @@
 import random
+import sys
 import numpy as np
 import matplotlib.pyplot as plt
 import tensorflow as tf
@@ -83,6 +84,8 @@ if __name__ == "__main__":
     bw = args.grayscale == "True"
     
     output_name = os.path.basename(args.model)
+    if output_name == "retired":
+        sys.exit()
 
     autoencoder = VAE.load(args.model)
     # autoencoder_c2 = VAE_c2.load("vae_sm_vid_c2")
@@ -90,7 +93,7 @@ if __name__ == "__main__":
     # autoencoder_c2.summary()
 
     img_height, img_width = 256, 256
-    x_test = load_selfmotion_vids([img_height, img_width], 5, bw)
+    x_test = load_selfmotion_vids([img_height, img_width], 100, bw)
 
     print("###################################################")
     print(args.model)
@@ -98,7 +101,7 @@ if __name__ == "__main__":
     print(output_name)
     
     print("Reconstruction")
-    num_sample_videos_to_show = 50
+    num_sample_videos_to_show = 1200
     sample_videos = select_videos(x_test, num_sample_videos_to_show)
     reconstructed_videos, latent_points = autoencoder.reconstruct(sample_videos)
     # reconstructed_videos_c2, latent_points_c2 = autoencoder_c2.reconstruct(sample_videos)
@@ -134,7 +137,7 @@ if __name__ == "__main__":
     plt.ylabel("Dimension-2", size=20)
     plt.xticks(size=20)
     plt.yticks(size=20)
-    plt.title(f"VAE - Projection of 2D Latent-Space ({output_name} artificial set)", size=20)
+    plt.title(f"{output_name}", size=15)
     plt.savefig(f"results/{output_name}_latent_representation.png")
 
     plot_reconstructed_videos(sample_videos, reconstructed_videos)
