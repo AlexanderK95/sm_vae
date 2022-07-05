@@ -2,5 +2,6 @@
 --epochs 1000
 --dataset-size 100
 --grayscale True
---recon-loss ssmi
---recon-weight 10000
+--recon-loss mse
+--recon-weight 100
+--suffix af_lrelu

@@ -181,8 +181,8 @@ class VAE:
                 padding="same",
                 name=f"conv_{layer_number}"
             )(x)
-            x = tf.keras.layers.ReLU(name=f"relu_{layer_number}")(x)
-            # x = tf.keras.layers.LeakyReLU(name=f"lrelu_{layer_number}")(x)
+            # x = tf.keras.layers.ReLU(name=f"relu_{layer_number}")(x)
+            x = tf.keras.layers.LeakyReLU(name=f"lrelu_{layer_number}")(x)
             x = tf.keras.layers.BatchNormalization(name=f"bn_{layer_number}")(x)
 
         # Final Block
@@ -218,8 +218,8 @@ class VAE:
                 padding="same",
                 name=f"conv_transpose_{layer_num}"
             )(x)
-            x = tf.keras.layers.ReLU(name=f"relu_{layer_num}")(x)
-            # x = tf.keras.layers.LeakyReLU(name=f"lrelu_{layer_num}")(x)
+            # x = tf.keras.layers.ReLU(name=f"relu_{layer_num}")(x)
+            x = tf.keras.layers.LeakyReLU(name=f"lrelu_{layer_num}")(x)
             x = tf.keras.layers.BatchNormalization(name=f"bn_{layer_num}")(x)
 
         output = tf.keras.layers.Conv3DTranspose(
@@ -260,10 +260,10 @@ class VAE:
         return K.abs(r_loss)
 
     def _ssmi_loss(self, y_true, y_pred):
-        ssmi = tf.image.ssim_multiscale(y_true,y_pred, 1, filter_size=5, filter_sigma=1)
+        ssmi = tf.image.ssim_multiscale(y_true, y_pred, 1, filter_size=5, filter_sigma=1)
         # r_loss = K.max(ssmi, axis=None)
         r_loss = K.mean(ssmi, axis=None)
-        return r_loss
+        return 1-r_loss
 
     def _kl_loss(self, y_true, y_pred):
         kl_loss = -0.5 * K.sum(1 + self.log_var - K.square(self.mean) - K.exp(self.log_var), axis = 1)
@@ -281,12 +281,12 @@ class VAE:
             self.conv_strides,
             self.latent_space_dim
         ]
-        save_path = os.path.join(save_folder, f"{prefix}_parameters.pkl")
+        save_path = os.path.join(save_folder, f"{prefix}parameters.pkl")
         with open(save_path, "wb") as f:
             pickle.dump(parameters, f)
 
     def _save_weights(self, save_folder, prefix):
-        save_path = os.path.join(save_folder, f"{prefix}_weights.h5")
+        save_path = os.path.join(save_folder, f"{prefix}weights.h5")
         self.model.save_weights(save_path)
 
 

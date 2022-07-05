@@ -1,1 +1,1 @@
-# sm_vae
+# Variational Autoencoder for generating novel selfmotion stimuli

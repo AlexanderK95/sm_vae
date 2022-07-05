@@ -84,6 +84,7 @@ if __name__ == "__main__":
     bw = args.grayscale == "True"
     
     output_name = os.path.basename(args.model)
+    print(output_name)
     if output_name == "retired":
         sys.exit()
 
@@ -93,7 +94,7 @@ if __name__ == "__main__":
     # autoencoder_c2.summary()
 
     img_height, img_width = 256, 256
-    x_test = load_selfmotion_vids([img_height, img_width], 100, bw)
+    x_test = load_selfmotion_vids([img_height, img_width], 100, bw, False)
 
     print("###################################################")
     print(args.model)
@@ -114,14 +115,17 @@ if __name__ == "__main__":
     # print(f"Reconstructed:  min: {np.min(reconstructed_videos_c2[0])}      max: {np.max(reconstructed_videos_c2[0])}      mean: {np.mean(reconstructed_videos_c2[0])}")
     # print(f"Latent Space:   min: {np.min(latent_points_c2[0])}             max: {np.max(latent_points_c2[0])}             mean: {np.mean(latent_points_c2[0])}")
 
-    save_video(f"results/{output_name}_recon.mp4", reconstructed_videos[0]*255)
-    save_video(f"results/{output_name}_original.mp4", sample_videos[0]*255)
+    save_video(f"results/{output_name}_recon.mp4", reconstructed_videos[3]*255)
+    save_video(f"results/{output_name}_original.mp4", sample_videos[3]*255)
     # save_video('test_c2.mp4', reconstructed_videos_c2[0]*255)
 
 
     n_to_show = 5000
     grid_size = 15
     figsize = 12
+
+    mean = np.mean(latent_points, axis=None)
+    std = np.std(latent_points, axis=None)
 
     tsne = TSNE(n_components=2, init='pca', random_state=0)
     X_tsne = tsne.fit_transform(latent_points.astype("float32"))
@@ -137,7 +141,7 @@ if __name__ == "__main__":
     plt.ylabel("Dimension-2", size=20)
     plt.xticks(size=20)
     plt.yticks(size=20)
-    plt.title(f"{output_name}", size=15)
+    plt.title(f"{output_name}\n(mean: {mean}, std: {std}", size=10)
     plt.savefig(f"results/{output_name}_latent_representation.png")
 
     plot_reconstructed_videos(sample_videos, reconstructed_videos)

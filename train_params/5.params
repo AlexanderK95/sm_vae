@@ -1,6 +1,7 @@
 --batch-size 32
 --epochs 1000
 --dataset-size 100
---grayscale False
---recon-loss ssmi
---recon-weight 10000
+--grayscale True
+--recon-loss mse
+--recon-weight 100000
+--suffix af_lrelu

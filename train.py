@@ -12,7 +12,7 @@ import datetime
 
 if __name__ == "__main__":
     # logdir = f"logs/fit/debug#
-    
+
 
     parser = argparse.ArgumentParser(description='Training parameters')
 
@@ -22,6 +22,7 @@ if __name__ == "__main__":
     parser.add_argument('--grayscale', help='Boolean whether dataset should be loades as grayscale')
     parser.add_argument('--recon-loss', help='loss function for the reconstruction loss')
     parser.add_argument('--recon-weight', help='reconstruction loss weight')
+    parser.add_argument('--suffix', help='optional, addition to filenames')
 
     args = parser.parse_args()
 
@@ -34,6 +35,8 @@ if __name__ == "__main__":
     bw = args.grayscale == "True"
     rl = args.recon_loss
     rlw = float(args.recon_weight)
+
+    suffix = args.suffix if not args.suffix==None else ""
 
     x_train = load_selfmotion_vids([img_height, img_width], dataset_size, bw)
 
@@ -76,4 +79,4 @@ if __name__ == "__main__":
 
     grayscale = "bw" if bw else "color"
 
-    vae.save(f"models/batch-size_{batch_size}#epochs_{epochs}#grayscale_{bw}#recon-loss_{rl}#recon-weight_{rlw}")
+    vae.save(f"models/batch-size_{batch_size}#epochs_{epochs}#grayscale_{bw}#recon-loss_{rl}#recon-weight_{rlw}#{suffix}")

@@ -22,10 +22,12 @@ def load_selfmotion(share=100):
     return x_train, y_train, x_test, y_test
 
 
-def load_selfmotion_vids(target_size, share=100, bw=False):
+def load_selfmotion_vids(target_size, share=100, bw=False, randomize=True):
     print("loading Dataset...")
     file_list = glob.glob('/home/kressal/datasets/selfmotion_vids/*mp4')
-    random.shuffle(file_list)
+    file_list.sort()
+    if randomize:
+        random.shuffle(file_list)
     num_images_to_load = round(len(file_list) * share / 100)
     print(f"#samples:  {num_images_to_load}")
 
