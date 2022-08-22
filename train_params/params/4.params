@@ -1,0 +1,7 @@
+--batch-size 32
+--epochs 1000
+--dataset-size 100
+--grayscale False
+--recon-loss psnr
+--recon-weight 10
+--suffix af_lrelu

@@ -1,0 +1,3 @@
+--model vae_sm_vid_False_ssmi
+--grayscale False
+--out ssmi_color
