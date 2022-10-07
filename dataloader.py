@@ -1,14 +1,21 @@
 import imageio
 import numpy as np
+import pandas as pd
 from PIL import Image
 import glob
 import random
-import skvideo
+from tqdm import tqdm
+import skvideo.io as sk
+import os
+from sm_vae import VAE
 
+def shuffle_along_axis(a, axis):
+    idx = np.random.rand(*a.shape).argsort(axis=axis)
+    return np.take_along_axis(a,idx,axis=axis)
 
 def load_selfmotion(share=100):
     print("loading Dataset...")
-    file_list = glob.glob('E:\Datasets\selfmotion_imgs\dump\*jpg')
+    file_list = glob.glob('E:\\Datasets\selfmotion_imgs\dump\*jpg')
     random.shuffle(file_list)
     num_images_to_load = round(len(file_list) * share / 100)
     print(f"#samples:  {num_images_to_load}")
@@ -22,35 +29,59 @@ def load_selfmotion(share=100):
     return x_train, y_train, x_test, y_test
 
 
-def load_selfmotion_vids(target_size, share=100, bw=False, randomize=True):
+def load_selfmotion_vids(path, video_dim, batch_size=32, train_split=0.8, bw=False, randomize=True):
     print("loading Dataset...")
-    file_list = glob.glob('/home/kressal/datasets/selfmotion_vids/*mp4')
-    file_list.sort()
-    if randomize:
-        random.shuffle(file_list)
-    num_images_to_load = round(len(file_list) * share / 100)
-    print(f"#samples:  {num_images_to_load}")
 
-    # sess = tf.compat.v1.Session()
+    base_path = os.path.dirname(path)
+    data = pd.read_csv(f"{path}", sep=",")
 
-    # x_train = np.empty(shape=(num_images_to_load, 8, target_size[0], target_size[1], 3)) if not bw else np.empty(shape=(num_images_to_load, 8, target_size[0], target_size[1]))
-    x_train = np.empty(shape=(num_images_to_load, 8, target_size[0], target_size[1], 3)).astype("float32") if not bw else np.empty(shape=(num_images_to_load, 8, target_size[0], target_size[1])).astype("float32")
-    for n in range(0, num_images_to_load):
-        # print(f"processing sample {n}/{num_images_to_load-1}")
-        # reader = imageio.get_reader(file_list[n])
-        # vid = np.array([img for img in reader])
-        # image_arr = image_arr[ymin:ymin+h, xmin:xmin+w]
-        vid = skvideo.io.vread(file_list[n])[0:8,:,:,:]/255.
-        _, height, width, _ = vid.shape
-        vid = vid[:, int((height-target_size[0])/2):int((height+target_size[0])/2), int((width-target_size[0])/2):int((width+target_size[0])/2), :]
-        if bw:
-            vid = np.mean(vid, axis=3)
-            # vid = vid.reshape(vid.shape + (1,))
-            x_train[n, :, :, :] = vid
-        else:
-            x_train[n, :, :, :, :] = vid
+   
+
+    split_idx = int(data.shape[0] * train_split)
+
+    out = np.empty([data.shape[0], video_dim[0], video_dim[1], video_dim[2], 3], dtype=np.float32) if not bw else np.empty([data.shape[0], video_dim[0], video_dim[1], video_dim[2]], dtype=np.float32)
+
+    idx = np.arange(data.shape[0])
+    np.random.shuffle(idx)
+
+    for i in tqdm(np.arange(data.shape[0])):
+        out[idx[i]] = sk.vread(os.path.join(base_path, data["file_head"][i])).squeeze()/255 if not bw else sk.vread(os.path.join(base_path, data["file_head"][i]), as_grey=True).squeeze()/255
+
+    y = data.loc[idx,"velX": "roll"]
+
+    x_train = out[:split_idx]
+    y_train = y[:split_idx]
+    x_test = out[split_idx:]
+    y_test = y[split_idx:]
 
     x_train = x_train.reshape(x_train.shape + (1,)) if bw else x_train
-    # x_train = np.mean(x_train, axis=4)
+    x_test = x_test.reshape(x_test.shape + (1,)) if bw else x_test
 
-    return x_train
+    return x_train, y_train, x_test, y_test
+
+
+
+if __name__ == "__main__":
+    img_height, img_width = 512, 512
+    batch_size = 32
+    epochs = 50
+    video_dim = [8, 512, 512]
+    bw = True
+    rl = "mse"
+    rlw = 10
+
+    x_train, y_train, x_test, y_test = load_selfmotion_vids("E:\\Datasets\\selfmotion\\20220930-134704_1.csv", video_dim, batch_size)
+
+
+    vae = VAE(
+        input_shape=(x_train.shape[1:]),
+        conv_filters=(64, 64, 64, 32, 16),
+        conv_kernels=([2,5,5], [2,4,4], [2,3,3], [2,3,3], [2,3,3]),
+        conv_strides=([1,2,2], [1,2,2], [2,2,2], [2,2,2], [2,1,1]),
+        latent_space_dim=420,
+        name="test"
+    )
+
+    vae.summary()
+    vae.compile(reconstruction_loss=rl, reconstruction_weight=rlw)
+    pass

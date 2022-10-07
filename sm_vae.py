@@ -20,7 +20,7 @@ import skvideo
 skvideo.setFFmpegPath('/home/kressal/.conda/envs/tf/bin')
 import skvideo.io
 
-import dataloader as dl
+# import dataloader as dl
 
 # from create_db import CustomDataGen
 
@@ -248,7 +248,7 @@ class VAE:
         x = tf.keras.layers.Dense(int(self.latent_space_dim/3), activation="relu")(x)
         x = tf.keras.layers.Dense(int(self.latent_space_dim/10), activation="relu")(x)
         heading_decoder_output = tf.keras.layers.Dense(6, activation="sigmoid")(x)
-        self.heading_decoder = tf.keras.Model(heading_decoder_input, heading_decoder_output, name="Heading Decoder")
+        self.heading_decoder = tf.keras.Model(heading_decoder_input, heading_decoder_output, name="Heading_Decoder")
         # dense_layer = tf.keras.layers.Dense(num_neurons, name="dense_1")(dorsalNet_input)
         # x = tf.keras.layers.Reshape(self._shape_before_bottleneck, name='Reshape')(dense_layer)
 
@@ -257,27 +257,27 @@ class VAE:
         model_input = self._model_input
         model_output_recon = self.decoder(self.encoder(model_input))
         model_output_heading = self.heading_decoder(self.encoder(model_input))
-        self.model = tf.keras.Model(model_input, (model_output_recon, model_output_heading), name="VAE")
+        self.model = tf.keras.Model(model_input, [model_output_recon, model_output_heading], name="VAE")
 
     def _combined_loss(self, y_true, y_pred):
-        if self._reconstruction_loss == "mse": reconstruction_loss = self._mse_loss(y_true, y_pred[0])
-        elif self._reconstruction_loss == "psnr": reconstruction_loss = self._psnr_loss(y_true, y_pred[0])
-        elif self._reconstruction_loss == "ssmi": reconstruction_loss = self._ssmi_loss(y_true, y_pred[0])
+        if self._reconstruction_loss == "mse": reconstruction_loss = self._mse_loss(y_true, y_pred)
+        elif self._reconstruction_loss == "psnr": reconstruction_loss = self._psnr_loss(y_true, y_pred)
+        elif self._reconstruction_loss == "ssmi": reconstruction_loss = self._ssmi_loss(y_true, y_pred)
         else: raise Exception("Invalid loss function")
 
-        kl_loss = self._kl_loss(y_true, y_pred[0])
+        kl_loss = self._kl_loss(y_true, y_pred)
 
-        heading_loss = self._mse_loss_heading(y_true, y_pred[1])
+        heading_loss = self._mse_loss_heading(y_true, y_pred)
 
         combined_loss = self.reconstruction_loss_weight * reconstruction_loss + kl_loss + heading_loss
         return combined_loss
 
     def _mse_loss(self, y_true, y_pred):
-        r_loss = K.mean(K.square(y_true - y_pred), axis = [1,2,3,4])
+        r_loss = K.mean(K.square(y_true[0] - y_pred[0]), axis = [1,2,3,4])
         return r_loss
 
     def _mse_loss_heading(self, y_true, y_pred):
-        r_loss = K.mean(K.square(y_true - y_pred), axis = [1])
+        r_loss = K.mean(K.square(y_true[1] - y_pred[1]))
         return r_loss
 
     def _psnr_loss(self, y_true, y_pred):
