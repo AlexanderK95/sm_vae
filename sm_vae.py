@@ -31,18 +31,20 @@ tf.compat.v1.disable_eager_execution()
 
 
 class VAE:
-    def __init__(self,input_shape, conv_filters, conv_kernels, conv_strides, latent_space_dim):
+    def __init__(self,input_shape, conv_filters, conv_kernels, conv_strides, latent_space_dim, name="not_set"):
         print("initializing vae...")
         self.input_shape = input_shape # [28, 28, 1]
         self.conv_filters = conv_filters # [2, 4, 8]
         self.conv_kernels = conv_kernels # [3, 5, 3]
         self.conv_strides = conv_strides # [1, 2, 2]
         self.latent_space_dim = latent_space_dim # 2
+        self.name = name
         self.reconstruction_loss_weight = 10000
 
         self.dataset = None
         self.encoder = None
         self.decoder = None
+        self.heading_decoder = None
         self.model = None
 
         self._optimizer = tf.keras.optimizers.Adam(lr = 0.0001)
@@ -77,11 +79,13 @@ class VAE:
     def reconstruct(self, images):
         latent_representations = self.encoder.predict(images)
         reconstructed_images = self.decoder.predict(latent_representations)
-        return reconstructed_images, latent_representations
+        predicted_heading = self.heading_decoder.predict(latent_representations)
+        return reconstructed_images, latent_representations, predicted_heading
 
     def summary(self):
         self.encoder.summary()
         self.decoder.summary()
+        self.heading_decoder.summary()
         self.model.summary()
 
     def compile(self, reconstruction_loss="mse", reconstruction_weight=1000, learning_rate=0.0001):
@@ -91,14 +95,16 @@ class VAE:
         if reconstruction_loss == "mse": rl = self._mse_loss
         elif reconstruction_loss == "psnr": rl = self._psnr_loss
         elif reconstruction_loss == "ssmi": rl = self._ssmi_loss
-        else: raise Exception("Invalid loss function")
+        else: raise Exception("Invalid loss function, currently supported are: mse, psnr and ssmi")
 
         optimizer = tf.optimizers.Adam(learning_rate=learning_rate)
         self.model.compile(
             optimizer=optimizer,
             loss=self._combined_loss,
             metrics=[rl,
-                    self._kl_loss])
+                    self._kl_loss,
+                    self._mse_loss_heading
+                    ])
 
 
     def train(self, train_ds, batch_size, num_epochs, grayscale, checkpoint_interval=50):
@@ -106,7 +112,7 @@ class VAE:
         bw = "gray" if grayscale else "color"
         
         model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
-            filepath="tmp/checkpoints/weights.{epoch:02d}-{loss:.2f}_"+self._reconstruction_loss+".hdf5",
+            filepath="tmp/checkpoints/weights.{epoch:02d}-{loss:.2f}_"+self.name+".hdf5",
             monitor='loss',
             verbose = 2,
             # save_best_only=True,
@@ -115,7 +121,7 @@ class VAE:
             save_freq = 1500,
             period = checkpoint_interval)
         early_stopping_callback = tf.keras.callbacks.EarlyStopping(monitor='loss')
-        self.log_dir = f"logs/fit/{self._reconstruction_loss}_{bw}_" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        self.log_dir = f"logs/fit/{self.name}_" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
         self.tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=self.log_dir, histogram_freq=1)
         self.model.fit(
             train_ds,
@@ -161,6 +167,7 @@ class VAE:
     def _build(self):
         self._build_encoder()
         self._build_decoder()
+        self._build_heading_decoder()
         self._build_autoencoder()
 
     def _build_encoder(self):
@@ -233,24 +240,44 @@ class VAE:
 
         self.decoder = tf.keras.Model(decoder_input, output, name="Decoder")
 
+    def _build_heading_decoder(self):
+        # num_neurons = np.prod(self._shape_before_bottleneck)
+
+        heading_decoder_input = tf.keras.Input(shape=self.latent_space_dim, name='input_layer')
+        x = tf.keras.layers.Dense(self.latent_space_dim, activation="relu")(heading_decoder_input)
+        x = tf.keras.layers.Dense(int(self.latent_space_dim/3), activation="relu")(x)
+        x = tf.keras.layers.Dense(int(self.latent_space_dim/10), activation="relu")(x)
+        heading_decoder_output = tf.keras.layers.Dense(6, activation="sigmoid")(x)
+        self.heading_decoder = tf.keras.Model(heading_decoder_input, heading_decoder_output, name="Heading Decoder")
+        # dense_layer = tf.keras.layers.Dense(num_neurons, name="dense_1")(dorsalNet_input)
+        # x = tf.keras.layers.Reshape(self._shape_before_bottleneck, name='Reshape')(dense_layer)
+
+
     def _build_autoencoder(self):
         model_input = self._model_input
-        model_output = self.decoder(self.encoder(model_input))
-        self.model = tf.keras.Model(model_input, model_output, name="VAE")
+        model_output_recon = self.decoder(self.encoder(model_input))
+        model_output_heading = self.heading_decoder(self.encoder(model_input))
+        self.model = tf.keras.Model(model_input, (model_output_recon, model_output_heading), name="VAE")
 
     def _combined_loss(self, y_true, y_pred):
-
-        if self._reconstruction_loss == "mse": reconstruction_loss = self._mse_loss(y_true, y_pred)
-        elif self._reconstruction_loss == "psnr": reconstruction_loss = self._psnr_loss(y_true, y_pred)
-        elif self._reconstruction_loss == "ssmi": reconstruction_loss = self._ssmi_loss(y_true, y_pred)
+        if self._reconstruction_loss == "mse": reconstruction_loss = self._mse_loss(y_true, y_pred[0])
+        elif self._reconstruction_loss == "psnr": reconstruction_loss = self._psnr_loss(y_true, y_pred[0])
+        elif self._reconstruction_loss == "ssmi": reconstruction_loss = self._ssmi_loss(y_true, y_pred[0])
         else: raise Exception("Invalid loss function")
 
-        kl_loss = self._kl_loss(y_true, y_pred)
-        combined_loss = self.reconstruction_loss_weight * reconstruction_loss + kl_loss
+        kl_loss = self._kl_loss(y_true, y_pred[0])
+
+        heading_loss = self._mse_loss_heading(y_true, y_pred[1])
+
+        combined_loss = self.reconstruction_loss_weight * reconstruction_loss + kl_loss + heading_loss
         return combined_loss
 
     def _mse_loss(self, y_true, y_pred):
         r_loss = K.mean(K.square(y_true - y_pred), axis = [1,2,3,4])
+        return r_loss
+
+    def _mse_loss_heading(self, y_true, y_pred):
+        r_loss = K.mean(K.square(y_true - y_pred), axis = [1])
         return r_loss
 
     def _psnr_loss(self, y_true, y_pred):
@@ -279,7 +306,8 @@ class VAE:
             self.conv_filters,
             self.conv_kernels,
             self.conv_strides,
-            self.latent_space_dim
+            self.latent_space_dim,
+            self.name
         ]
         save_path = os.path.join(save_folder, f"{prefix}parameters.pkl")
         with open(save_path, "wb") as f:
