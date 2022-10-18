@@ -63,14 +63,14 @@ def load_selfmotion_vids(path, video_dim, batch_size=32, train_split=0.8, bw=Fal
 
 if __name__ == "__main__":
     img_height, img_width = 512, 512
-    batch_size = 32
+    batch_size = 16
     epochs = 50
     video_dim = [8, 512, 512]
     bw = True
     rl = "mse"
     rlw = 10
 
-    x_train, y_train, x_test, y_test = load_selfmotion_vids("E:\\Datasets\\selfmotion\\20220930-134704_1.csv", video_dim, batch_size)
+    x_train, y_train, x_test, y_test = load_selfmotion_vids("N:\\Datasets\\selfmotion\\20220930-134704_1.csv", video_dim, batch_size)
 
 
     vae = VAE(
@@ -84,4 +84,7 @@ if __name__ == "__main__":
 
     vae.summary()
     vae.compile(reconstruction_loss=rl, reconstruction_weight=rlw)
+
+    vae.train(x_train, [x_train, y_train], batch_size, num_epochs=epochs, grayscale=bw, checkpoint_interval=100)
+
     pass

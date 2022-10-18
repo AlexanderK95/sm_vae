@@ -107,7 +107,7 @@ class VAE:
                     ])
 
 
-    def train(self, train_ds, batch_size, num_epochs, grayscale, checkpoint_interval=50):
+    def train(self, train_x_ds, train_y_ds, batch_size, num_epochs, grayscale, checkpoint_interval=50):
 
         bw = "gray" if grayscale else "color"
         
@@ -124,8 +124,8 @@ class VAE:
         self.log_dir = f"logs/fit/{self.name}_" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
         self.tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=self.log_dir, histogram_freq=1)
         self.model.fit(
-            train_ds,
-            train_ds,
+            train_x_ds,
+            train_y_ds,
             # validation_data=val_ds,
             batch_size=batch_size,
             epochs=num_epochs,
@@ -273,7 +273,7 @@ class VAE:
         return combined_loss
 
     def _mse_loss(self, y_true, y_pred):
-        r_loss = K.mean(K.square(y_true[0] - y_pred[0]), axis = [1,2,3,4])
+        r_loss = K.mean(K.square(y_true[0] - y_pred[0]), axis = None)
         return r_loss
 
     def _mse_loss_heading(self, y_true, y_pred):
