@@ -101,10 +101,10 @@ class VAE:
         else: raise Exception("Invalid loss function, currently supported are: mse, psnr and ssmi")
 
         losses = {
-            "VAE": self._combined_loss,
+            "Decoder": self._combined_loss,
             "Heading_Decoder": "mse"
         }
-        lossWeights = {"VAE": 1.0, "Heading_Decoder": 1.0}
+        lossWeights = {"Decoder": 1.0, "Heading_Decoder": 1.0}
 
         optimizer = tf.optimizers.Adam(learning_rate=learning_rate)
         self.model.compile(
@@ -138,7 +138,7 @@ class VAE:
         self.model.fit(
             x=train_x_ds,
             y={
-               "VAE": train_y_ds[0],
+               "Decoder": train_y_ds[0],
                "Heading_Decoder": train_y_ds[1]
             },
             # validation_data=val_ds,
@@ -275,6 +275,8 @@ class VAE:
         model_output_recon = self.decoder(self.encoder(model_input))
 
         # model_output_heading = self.heading_decoder(self.encoder(model_input))
+        test_layer = tf.keras.Input(shape=model_input.shape, name='input_layer')
+        test_out = tf.keras.layers.Dense(3,'relu')(test_layer)
         self.vae = tf.keras.Model(inputs=model_input, outputs=model_output_recon, name="VAE")
         self.model = tf.keras.Model(inputs=model_input, outputs=[model_output_recon, model_output_heading], name="VAE_hd")
 
