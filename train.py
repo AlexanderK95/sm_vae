@@ -36,9 +36,12 @@ if __name__ == "__main__":
     rl = args.recon_loss
     rlw = float(args.recon_weight)
 
+    video_dim = [8, 512, 512]
+
     suffix = args.suffix if not args.suffix==None else ""
 
-    x_train = load_selfmotion_vids([img_height, img_width], dataset_size, bw)
+    # x_train = load_selfmotion_vids([img_height, img_width], dataset_size, bw)
+    x_train, y_train, x_test, y_test = load_selfmotion_vids("/mnt/masc_home/kressal/datasets/selfmotion/20220930-134704_1.csv", video_dim, batch_size)
 
     # path = "/home/kressal/datasets/selfmotion_vids"
     # files = [os.path.join(path,fn) for fn in os.listdir(path)]
@@ -79,7 +82,7 @@ if __name__ == "__main__":
     vae.summary()
     vae.compile(reconstruction_loss=rl, reconstruction_weight=rlw)
     
-    vae.train(x_train, batch_size, num_epochs=epochs, grayscale=bw, checkpoint_interval=100)
+    vae.train(x_train, [x_train, y_train], batch_size, num_epochs=epochs, grayscale=bw, checkpoint_interval=100)
     # vae.train2(train_data, num_epochs=epochs, checkpoint_interval=int(epochs/10))
 
 

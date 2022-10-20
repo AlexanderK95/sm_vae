@@ -47,6 +47,8 @@ class VAE:
         self.heading_decoder = None
         self.model = None
 
+        self.vae = None
+
         self._optimizer = tf.keras.optimizers.Adam(lr = 0.0001)
         self._checkpoint_filepath = './tmp/checkpoint'
 
@@ -86,6 +88,7 @@ class VAE:
         self.encoder.summary()
         self.decoder.summary()
         self.heading_decoder.summary()
+        self.vae.summary()
         self.model.summary()
 
     def compile(self, reconstruction_loss="mse", reconstruction_weight=1000, learning_rate=0.0001):
@@ -97,14 +100,23 @@ class VAE:
         elif reconstruction_loss == "ssmi": rl = self._ssmi_loss
         else: raise Exception("Invalid loss function, currently supported are: mse, psnr and ssmi")
 
+        losses = {
+            "VAE": self._combined_loss,
+            "Heading_Decoder": "mse"
+        }
+        lossWeights = {"VAE": 1.0, "Heading_Decoder": 1.0}
+
         optimizer = tf.optimizers.Adam(learning_rate=learning_rate)
         self.model.compile(
             optimizer=optimizer,
-            loss=self._combined_loss,
-            metrics=[rl,
-                    self._kl_loss,
-                    self._mse_loss_heading
-                    ])
+            loss=losses,
+            loss_weights=lossWeights,
+            # loss=self._combined_loss,
+            # metrics=[rl,
+            #         self._kl_loss,
+            #         self._mse_loss_heading
+            #         ]
+        )
 
 
     def train(self, train_x_ds, train_y_ds, batch_size, num_epochs, grayscale, checkpoint_interval=50):
@@ -124,8 +136,11 @@ class VAE:
         self.log_dir = f"logs/fit/{self.name}_" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
         self.tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=self.log_dir, histogram_freq=1)
         self.model.fit(
-            train_x_ds,
-            train_y_ds,
+            x=train_x_ds,
+            y={
+               "VAE": train_y_ds[0],
+               "Heading_Decoder": train_y_ds[1]
+            },
             # validation_data=val_ds,
             batch_size=batch_size,
             epochs=num_epochs,
@@ -249,15 +264,19 @@ class VAE:
         x = tf.keras.layers.Dense(int(self.latent_space_dim/10), activation="relu")(x)
         heading_decoder_output = tf.keras.layers.Dense(6, activation="sigmoid")(x)
         self.heading_decoder = tf.keras.Model(heading_decoder_input, heading_decoder_output, name="Heading_Decoder")
+
         # dense_layer = tf.keras.layers.Dense(num_neurons, name="dense_1")(dorsalNet_input)
         # x = tf.keras.layers.Reshape(self._shape_before_bottleneck, name='Reshape')(dense_layer)
 
 
     def _build_autoencoder(self):
         model_input = self._model_input
-        model_output_recon = self.decoder(self.encoder(model_input))
         model_output_heading = self.heading_decoder(self.encoder(model_input))
-        self.model = tf.keras.Model(model_input, [model_output_recon, model_output_heading], name="VAE")
+        model_output_recon = self.decoder(self.encoder(model_input))
+
+        # model_output_heading = self.heading_decoder(self.encoder(model_input))
+        self.vae = tf.keras.Model(inputs=model_input, outputs=model_output_recon, name="VAE")
+        self.model = tf.keras.Model(inputs=model_input, outputs=[model_output_recon, model_output_heading], name="VAE_hd")
 
     def _combined_loss(self, y_true, y_pred):
         if self._reconstruction_loss == "mse": reconstruction_loss = self._mse_loss(y_true, y_pred)
@@ -267,17 +286,17 @@ class VAE:
 
         kl_loss = self._kl_loss(y_true, y_pred)
 
-        heading_loss = self._mse_loss_heading(y_true, y_pred)
+        # heading_loss = self._mse_loss_heading(y_true, y_pred)
 
-        combined_loss = self.reconstruction_loss_weight * reconstruction_loss + kl_loss + heading_loss
+        combined_loss = self.reconstruction_loss_weight * reconstruction_loss + kl_loss
         return combined_loss
 
     def _mse_loss(self, y_true, y_pred):
-        r_loss = K.mean(K.square(y_true[0] - y_pred[0]), axis = None)
+        r_loss = K.mean(K.square(y_true - y_pred), axis=None)
         return r_loss
 
     def _mse_loss_heading(self, y_true, y_pred):
-        r_loss = K.mean(K.square(y_true[1] - y_pred[1]))
+        r_loss = K.mean(K.square(y_true - y_pred), axis=None)
         return r_loss
 
     def _psnr_loss(self, y_true, y_pred):
