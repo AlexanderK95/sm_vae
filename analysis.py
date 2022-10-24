@@ -93,8 +93,9 @@ if __name__ == "__main__":
     # autoencoder.summary()
     # autoencoder_c2.summary()
 
-    img_height, img_width = 256, 256
-    x_test = load_selfmotion_vids([img_height, img_width], 100, bw, False)
+    video_dim = [8, 512, 512]
+    batch_size = 16
+    x_train, y_train, x_test, y_test = load_selfmotion_vids("/mnt/masc_home/kressal/datasets/selfmotion/20220930-134704_1.csv", video_dim, batch_size, bw=bw)
 
     print("###################################################")
     print(args.model)
@@ -102,9 +103,9 @@ if __name__ == "__main__":
     print(output_name)
     
     print("Reconstruction")
-    num_sample_videos_to_show = 1200
+    num_sample_videos_to_show = 3
     sample_videos = select_videos(x_test, num_sample_videos_to_show)
-    reconstructed_videos, latent_points = autoencoder.reconstruct(sample_videos)
+    reconstructed_videos, latent_points, headings = autoencoder.reconstruct(sample_videos)
     # reconstructed_videos_c2, latent_points_c2 = autoencoder_c2.reconstruct(sample_videos)
 
     print(reconstructed_videos.shape)
@@ -114,9 +115,11 @@ if __name__ == "__main__":
     # print(reconstructed_videos_c2.shape)
     # print(f"Reconstructed:  min: {np.min(reconstructed_videos_c2[0])}      max: {np.max(reconstructed_videos_c2[0])}      mean: {np.mean(reconstructed_videos_c2[0])}")
     # print(f"Latent Space:   min: {np.min(latent_points_c2[0])}             max: {np.max(latent_points_c2[0])}             mean: {np.mean(latent_points_c2[0])}")
-
-    save_video(f"results/{output_name}_recon.mp4", reconstructed_videos[3]*255)
-    save_video(f"results/{output_name}_original.mp4", sample_videos[3]*255)
+    print(reconstructed_videos[0].max())
+    print(reconstructed_videos[0].min())
+    
+    save_video(f"results/{output_name}_recon.mp4", reconstructed_videos[0]*255)
+    save_video(f"results/{output_name}_original.mp4", sample_videos[0]*255)
     # save_video('test_c2.mp4', reconstructed_videos_c2[0]*255)
 
 

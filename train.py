@@ -41,7 +41,7 @@ if __name__ == "__main__":
     suffix = args.suffix if not args.suffix==None else ""
 
     # x_train = load_selfmotion_vids([img_height, img_width], dataset_size, bw)
-    x_train, y_train, x_test, y_test = load_selfmotion_vids("/mnt/masc_home/kressal/datasets/selfmotion/20220930-134704_1.csv", video_dim, batch_size)
+    x_train, y_train, x_test, y_test = load_selfmotion_vids("/mnt/masc_home/kressal/datasets/selfmotion/20220930-134704_1.csv", video_dim, batch_size, bw=bw)
 
     # path = "/home/kressal/datasets/selfmotion_vids"
     # files = [os.path.join(path,fn) for fn in os.listdir(path)]

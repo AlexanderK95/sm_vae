@@ -39,13 +39,13 @@ def load_selfmotion_vids(path, video_dim, batch_size=32, train_split=0.8, bw=Fal
 
     split_idx = int(data.shape[0] * train_split)
 
-    out = np.empty([data.shape[0], video_dim[0], video_dim[1], video_dim[2], 3], dtype=np.uint8) if not bw else np.empty([data.shape[0], video_dim[0], video_dim[1], video_dim[2]], dtype=np.uint8)
+    out = np.empty([data.shape[0], video_dim[0], video_dim[1], video_dim[2], 3], dtype=np.uint8) if not bw else np.empty([data.shape[0], video_dim[0], video_dim[1], video_dim[2]], dtype=np.float32)
 
     idx = np.arange(data.shape[0])
     np.random.shuffle(idx)
 
     for i in tqdm(np.arange(data.shape[0])):
-        out[idx[i]] = sk.vread(os.path.join(base_path, data["file_head"][i])).squeeze()/255 if not bw else sk.vread(os.path.join(base_path, data["file_head"][i]), as_grey=True).squeeze()/255
+        out[idx[i]] = sk.vread(os.path.join(base_path, data["file_head"][i])).squeeze().astype("float32")/255 if not bw else sk.vread(os.path.join(base_path, data["file_head"][i]), as_grey=True).squeeze().astype("float32")/255
 
     y = data.loc[idx,"velX": "roll"].to_numpy()
 
@@ -70,8 +70,9 @@ def load_selfmotion_vids(path, video_dim, batch_size=32, train_split=0.8, bw=Fal
 #     rl = "mse"
 #     rlw = 10
 
-#     x_train, y_train, x_test, y_test = load_selfmotion_vids("N:\\Datasets\\selfmotion\\20220930-134704_1.csv", video_dim, batch_size)
+#     x_train, y_train, x_test, y_test = load_selfmotion_vids("E:\\Datasets\\selfmotion\\20220930-134704_1.csv", video_dim, batch_size)
 
+#     x_train2, y_train2, x_test2, y_test2 = load_selfmotion(1)
 
 #     vae = VAE(
 #         input_shape=(x_train.shape[1:]),

@@ -104,7 +104,7 @@ class VAE:
             "Decoder": self._combined_loss,
             "Heading_Decoder": "mse"
         }
-        lossWeights = {"Decoder": 1.0, "Heading_Decoder": 1.0}
+        lossWeights = {"Decoder": 1.0, "Heading_Decoder": 0}
 
         optimizer = tf.optimizers.Adam(learning_rate=learning_rate)
         self.model.compile(
