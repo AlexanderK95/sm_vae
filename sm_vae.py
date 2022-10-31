@@ -9,6 +9,7 @@ import pickle
 import tensorflow as tf
 # from keras import layers
 from tensorflow.keras import backend as K
+import tensorflow.keras as keras
 # from IPython import display
 import datetime
 import math
@@ -138,7 +139,7 @@ class VAE:
         self.model.fit(
             x=train_x_ds,
             y={
-               "VAE": train_y_ds[0],
+               "Decoder": train_y_ds[0],
                "Heading_Decoder": train_y_ds[1]
             },
             # validation_data=val_ds,
@@ -342,42 +343,43 @@ class VAE:
 
 
 
-# if __name__ == "__main__":
+if __name__ == "__main__":
     
-#     print(tf.__version__)
-#     print("running main...")
+    print(tf.__version__)
+    print("running main...")
 
-#     img_height, img_width = 256, 256
-#     batch_size = 64
+    img_height, img_width = 256, 256
+    batch_size = 64
 
-#     # x_train = dl.load_selfmotion_vids([img_height, img_width], 100, True)
+    # x_train = dl.load_selfmotion_vids([img_height, img_width], 100, True)
 
-#     # path = "E:\\Datasets\\selfmotion_vids"
-#     # files = [os.path.join(path,fn) for fn in os.listdir(path)]
-#     # df = pd.DataFrame(files, columns=["filepath"])
-#     # train_data = CustomDataGen(df, batch_size, input_size=(img_height, img_width))
+    # path = "E:\\Datasets\\selfmotion_vids"
+    # files = [os.path.join(path,fn) for fn in os.listdir(path)]
+    # df = pd.DataFrame(files, columns=["filepath"])
+    # train_data = CustomDataGen(df, batch_size, input_size=(img_height, img_width))
 
-#     vae = VAE(
-#         input_shape=([8,512,512,1]),
-#         conv_filters=(64, 32, 16),
-#         conv_kernels=(8, 4, 3),
-#         conv_strides=(2, 2, 2),
-#         latent_space_dim=420
-#     )
+    vae = VAE(
+        input_shape=([8,512,512,1]),
+        conv_filters=(64, 32, 16),
+        conv_kernels=(8, 4, 3),
+        conv_strides=(2, 2, 2),
+        latent_space_dim=420
+    )
 
-#     # vae = VAE(
-#     #     input_shape=(x_train.shape[1:]),
-#     #     conv_filters=(64, 64, 64, 32, 16),
-#     #     conv_kernels=(4, 2, 3, 3, 4),
-#     #     conv_strides=(2, 2, 2, 1, 1),
-#     #     latent_space_dim=420
-#     # )
+    # vae = VAE(
+    #     input_shape=(x_train.shape[1:]),
+    #     conv_filters=(64, 64, 64, 32, 16),
+    #     conv_kernels=(4, 2, 3, 3, 4),
+    #     conv_strides=(2, 2, 2, 1, 1),
+    #     latent_space_dim=420
+    # )
 
-#     vae.summary()
-#     vae.compile()
+    vae.summary()
+    keras.utils.plot_model(vae.model, show_shapes=True)
+    vae.compile()
     
-#     vae.train(x_train, batch_size, num_epochs=1000, checkpoint_interval=100)
-#     # vae.train2(train_data, num_epochs=10)
-#     vae.save("vae_sm_vid")
-#     pass
+    vae.train(x_train, batch_size, num_epochs=1000, checkpoint_interval=100)
+    # vae.train2(train_data, num_epochs=10)
+    vae.save("vae_sm_vid")
+    pass
 
