@@ -1,13 +1,13 @@
 import torch
-from models import BaseVAE
+import torchvision
+# from models import BaseVAE
 from torch import nn
 from torch.nn import functional as F
-from .types_ import *
+# from .types_ import *
+from torchsummary import summary
 
 
-class VanillaVAE(BaseVAE):
-
-
+class VanillaVAE(nn.Module):
     def __init__(self,
                  input_shape, 
                  conv_filters, 
@@ -89,7 +89,7 @@ class VanillaVAE(BaseVAE):
                                       kernel_size= 3, padding= 1),
                             nn.Tanh())
 
-    def encode(self, input: Tensor) -> List[Tensor]:
+    def encode(self, input):
         """
         Encodes the input by passing through the encoder network
         and returns the latent codes.
@@ -106,7 +106,7 @@ class VanillaVAE(BaseVAE):
 
         return [mu, log_var]
 
-    def decode(self, z: Tensor) -> Tensor:
+    def decode(self, z):
         """
         Maps the given latent codes
         onto the image space.
@@ -119,7 +119,7 @@ class VanillaVAE(BaseVAE):
         result = self.final_layer(result)
         return result
 
-    def reparameterize(self, mu: Tensor, logvar: Tensor) -> Tensor:
+    def reparameterize(self, mu, logvar):
         """
         Reparameterization trick to sample from N(mu, var) from
         N(0,1).
@@ -131,7 +131,7 @@ class VanillaVAE(BaseVAE):
         eps = torch.randn_like(std)
         return eps * std + mu
 
-    def forward(self, input: Tensor, **kwargs) -> List[Tensor]:
+    def forward(self, input, **kwargs):
         mu, log_var = self.encode(input)
         z = self.reparameterize(mu, log_var)
         return  [self.decode(z), input, mu, log_var]
@@ -162,7 +162,7 @@ class VanillaVAE(BaseVAE):
 
     def sample(self,
                num_samples:int,
-               current_device: int, **kwargs) -> Tensor:
+               current_device: int, **kwargs):
         """
         Samples from the latent space and return the corresponding
         image space map.
@@ -178,7 +178,7 @@ class VanillaVAE(BaseVAE):
         samples = self.decode(z)
         return samples
 
-    def generate(self, x: Tensor, **kwargs) -> Tensor:
+    def generate(self, x, **kwargs):
         """
         Given an input image x, returns the reconstructed image
         :param x: (Tensor) [B x C x H x W]
@@ -186,3 +186,28 @@ class VanillaVAE(BaseVAE):
         """
 
         return self.forward(x)[0]
+
+def train(vae, data, epochs=20):
+    opt = torch.optim.Adam(vae.parameters())  
+    for epoch in range(epochs):
+        for x, y in data:
+            x = x.to('gpu') # GPU
+            opt.zero_grad()
+            x_hat = vae(x)
+            loss = ((x - x_hat)**2).sum() + vae.encoder.kl
+            loss.backward()
+            opt.step()
+    return vae
+
+if __name__ == "__main__":
+    # dataset = torchvision.datasets.UCF101("N:\\Datasets\\ucf101\\data", "N:\\Datasets\\ucf101\\ucfTrainTestlist", frames_per_clip=8)
+
+
+    input_shape = [28, 28, 1]
+    conv_filters = [2, 4, 8]
+    conv_kernels = [3, 5, 3]
+    conv_strides = [1, 2, 2]
+    latent_space_dim = 2
+
+    vae = VanillaVAE(input_shape, conv_filters, conv_kernels, conv_strides, latent_space_dim)
+    pass

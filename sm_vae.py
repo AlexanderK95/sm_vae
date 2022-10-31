@@ -101,7 +101,7 @@ class VAE:
         else: raise Exception("Invalid loss function, currently supported are: mse, psnr and ssmi")
 
         losses = {
-            "Decoder": self._combined_loss,
+            "VAE": self._combined_loss,
             "Heading_Decoder": "mse"
         }
         lossWeights = {"Decoder": 1.0, "Heading_Decoder": 0}
@@ -138,7 +138,7 @@ class VAE:
         self.model.fit(
             x=train_x_ds,
             y={
-               "Decoder": train_y_ds[0],
+               "VAE": train_y_ds[0],
                "Heading_Decoder": train_y_ds[1]
             },
             # validation_data=val_ds,
@@ -271,12 +271,13 @@ class VAE:
 
     def _build_autoencoder(self):
         model_input = self._model_input
-        model_output_heading = self.heading_decoder(self.encoder(model_input))
-        model_output_recon = self.decoder(self.encoder(model_input))
+        embedding = self.encoder(model_input)
+        model_output_heading = self.heading_decoder(embedding)
+        model_output_recon = self.decoder(embedding)
 
         # model_output_heading = self.heading_decoder(self.encoder(model_input))
-        test_layer = tf.keras.Input(shape=model_input.shape, name='input_layer')
-        test_out = tf.keras.layers.Dense(3,'relu')(test_layer)
+        # test_layer = tf.keras.Input(shape=model_input.shape, name='input_layer')
+        # test_out = tf.keras.layers.Dense(3,'relu')(test_layer)
         self.vae = tf.keras.Model(inputs=model_input, outputs=model_output_recon, name="VAE")
         self.model = tf.keras.Model(inputs=model_input, outputs=[model_output_recon, model_output_heading], name="VAE_hd")
 
@@ -349,7 +350,7 @@ class VAE:
 #     img_height, img_width = 256, 256
 #     batch_size = 64
 
-#     x_train = dl.load_selfmotion_vids([img_height, img_width], 100, True)
+#     # x_train = dl.load_selfmotion_vids([img_height, img_width], 100, True)
 
 #     # path = "E:\\Datasets\\selfmotion_vids"
 #     # files = [os.path.join(path,fn) for fn in os.listdir(path)]
@@ -357,12 +358,20 @@ class VAE:
 #     # train_data = CustomDataGen(df, batch_size, input_size=(img_height, img_width))
 
 #     vae = VAE(
-#         input_shape=(x_train.shape[1:]),
-#         conv_filters=(64, 64, 64, 32, 16),
-#         conv_kernels=(4, 2, 3, 3, 4),
-#         conv_strides=(2, 2, 2, 1, 1),
+#         input_shape=([8,512,512,1]),
+#         conv_filters=(64, 32, 16),
+#         conv_kernels=(8, 4, 3),
+#         conv_strides=(2, 2, 2),
 #         latent_space_dim=420
 #     )
+
+#     # vae = VAE(
+#     #     input_shape=(x_train.shape[1:]),
+#     #     conv_filters=(64, 64, 64, 32, 16),
+#     #     conv_kernels=(4, 2, 3, 3, 4),
+#     #     conv_strides=(2, 2, 2, 1, 1),
+#     #     latent_space_dim=420
+#     # )
 
 #     vae.summary()
 #     vae.compile()
