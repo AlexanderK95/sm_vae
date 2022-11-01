@@ -20,15 +20,18 @@ import random
 import skvideo
 skvideo.setFFmpegPath('/home/kressal/.conda/envs/tf/bin')
 import skvideo.io
-
+from tensorflow.python.framework.ops import disable_eager_execution
 # import dataloader as dl
 
 # from create_db import CustomDataGen
 
+# disable_eager_execution()
+tf.config.run_functions_eagerly(True)
 # os.environ['CUDA_VISIBLE_DEVICES'] = '1'
-tf.compat.v1.disable_eager_execution()
+# tf.compat.v1.disable_eager_execution()
 # tf.config.experimental_run_functions_eagerly(True)
 # tf.compat.v1.experimental.output_all_intermediates(False)
+
 
 
 class VAE:
@@ -102,16 +105,26 @@ class VAE:
         else: raise Exception("Invalid loss function, currently supported are: mse, psnr and ssmi")
 
         losses = {
-            "VAE": self._combined_loss,
-            "Heading_Decoder": "mse"
+            "Decoder": self._combined_loss,
+            "Heading_Decoder": 'mse'
         }
-        lossWeights = {"Decoder": 1.0, "Heading_Decoder": 0}
+        lossWeights = {
+            "Decoder": 1.0,
+            "Heading_Decoder": 1.0
+        }
+        metrics = {
+            "Decoder": 'mse',
+            # "Decoder": [rl, self._kl_loss],
+            "Heading_Decoder": 'accuracy'
+        }
 
         optimizer = tf.optimizers.Adam(learning_rate=learning_rate)
         self.model.compile(
             optimizer=optimizer,
             loss=losses,
             loss_weights=lossWeights,
+            metrics=metrics,
+            # experimental_run_tf_function=False
             # loss=self._combined_loss,
             # metrics=[rl,
             #         self._kl_loss,
@@ -119,31 +132,36 @@ class VAE:
             #         ]
         )
 
-
-    def train(self, train_x_ds, train_y_ds, batch_size, num_epochs, grayscale, checkpoint_interval=50):
-
+    def train(self, train_gen, validation_gen, batch_size, num_epochs, grayscale, checkpoint_interval=50):
         bw = "gray" if grayscale else "color"
         
+        
+        # tf.compat.v1.placeholder(
+        #     float, shape=[None, None], name='Heading_Decoder_target'
+        # )
+
         model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
             filepath="tmp/checkpoints/weights.{epoch:02d}-{loss:.2f}_"+self.name+".hdf5",
             monitor='loss',
-            verbose = 2,
+            verbose = 4,
             # save_best_only=True,
             save_weights_only=True,
             # mode='min',
             save_freq = 1500,
-            period = checkpoint_interval)
+            # period = checkpoint_interval
+        )
         early_stopping_callback = tf.keras.callbacks.EarlyStopping(monitor='loss')
         self.log_dir = f"logs/fit/{self.name}_" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
         self.tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=self.log_dir, histogram_freq=1)
-        self.model.fit(
-            x=train_x_ds,
-            y={
-               "Decoder": train_y_ds[0],
-               "Heading_Decoder": train_y_ds[1]
-            },
-            # validation_data=val_ds,
-            batch_size=batch_size,
+        history = self.model.fit(
+            train_gen,
+            # y={
+            #    "Decoder": [None, self.input_shape[0], self.input_shape[1], self.input_shape[2], self.input_shape[3]],
+            #    "Heading_Decoder": [None, 6]
+            # },
+            validation_data=validation_gen,
+            # batch_size=batch_size,
+            verbose = 4,
             epochs=num_epochs,
             shuffle=True,
             callbacks=[
@@ -153,6 +171,7 @@ class VAE:
                 tf.keras.callbacks.LearningRateScheduler(lambda epoch: 0.0001 * math.exp(-0.001*epoch))
             ]
         )
+        return history
 
     def train2(self, train_ds, num_epochs, checkpoint_interval=50):
         
@@ -179,7 +198,7 @@ class VAE:
                 tf.keras.callbacks.LearningRateScheduler(lambda epoch: 0.0001 * math.exp(-0.001*epoch))
             ]
         )
-
+    # @tf.function
     def _build(self):
         self._build_encoder()
         self._build_decoder()
@@ -223,7 +242,7 @@ class VAE:
             return tf.convert_to_tensor(sampled_point)
 
         output = tf.keras.layers.Lambda(function=sample_point_from_normal_distribution, name="lambda")([self.mean, self.log_var])
-        self.encoder = tf.keras.Model(encoder_input, output, name="Encoder")
+        self.encoder = tf.keras.Model(encoder_input, self.mean, name="Encoder")
 
     def _build_decoder(self):
         num_neurons = np.prod(self._shape_before_bottleneck)
@@ -269,7 +288,6 @@ class VAE:
         # dense_layer = tf.keras.layers.Dense(num_neurons, name="dense_1")(dorsalNet_input)
         # x = tf.keras.layers.Reshape(self._shape_before_bottleneck, name='Reshape')(dense_layer)
 
-
     def _build_autoencoder(self):
         model_input = self._model_input
         embedding = self.encoder(model_input)
@@ -283,12 +301,15 @@ class VAE:
         self.model = tf.keras.Model(inputs=model_input, outputs=[model_output_recon, model_output_heading], name="VAE_hd")
 
     def _combined_loss(self, y_true, y_pred):
+        # print(type(y_pred))
+        # print(type(y_true))
         if self._reconstruction_loss == "mse": reconstruction_loss = self._mse_loss(y_true, y_pred)
         elif self._reconstruction_loss == "psnr": reconstruction_loss = self._psnr_loss(y_true, y_pred)
         elif self._reconstruction_loss == "ssmi": reconstruction_loss = self._ssmi_loss(y_true, y_pred)
         else: raise Exception("Invalid loss function")
 
         kl_loss = self._kl_loss(y_true, y_pred)
+        print([type(kl_loss), kl_loss.shape])
 
         # heading_loss = self._mse_loss_heading(y_true, y_pred)
 
@@ -296,7 +317,10 @@ class VAE:
         return combined_loss
 
     def _mse_loss(self, y_true, y_pred):
+        # print([type(y_pred), y_pred.shape])
+        # print([type(y_true), y_true.shape])
         r_loss = K.mean(K.square(y_true - y_pred), axis=None)
+        # print([type(r_loss), r_loss.shape])
         return r_loss
 
     def _mse_loss_heading(self, y_true, y_pred):
@@ -316,6 +340,8 @@ class VAE:
         return 1-r_loss
 
     def _kl_loss(self, y_true, y_pred):
+        print([type(self.log_var.eval()), self.log_var.shape])
+        print([type(y_pred), y_pred.shape])
         kl_loss = -0.5 * K.sum(1 + self.log_var - K.square(self.mean) - K.exp(self.log_var), axis = 1)
         return kl_loss
 
@@ -343,43 +369,43 @@ class VAE:
 
 
 
-if __name__ == "__main__":
+# if __name__ == "__main__":
     
-    print(tf.__version__)
-    print("running main...")
+#     print(tf.__version__)
+#     print("running main...")
 
-    img_height, img_width = 256, 256
-    batch_size = 64
+#     img_height, img_width = 256, 256
+#     batch_size = 64
 
-    # x_train = dl.load_selfmotion_vids([img_height, img_width], 100, True)
+#     # x_train = dl.load_selfmotion_vids([img_height, img_width], 100, True)
 
-    # path = "E:\\Datasets\\selfmotion_vids"
-    # files = [os.path.join(path,fn) for fn in os.listdir(path)]
-    # df = pd.DataFrame(files, columns=["filepath"])
-    # train_data = CustomDataGen(df, batch_size, input_size=(img_height, img_width))
+#     # path = "E:\\Datasets\\selfmotion_vids"
+#     # files = [os.path.join(path,fn) for fn in os.listdir(path)]
+#     # df = pd.DataFrame(files, columns=["filepath"])
+#     # train_data = CustomDataGen(df, batch_size, input_size=(img_height, img_width))
 
-    vae = VAE(
-        input_shape=([8,512,512,1]),
-        conv_filters=(64, 32, 16),
-        conv_kernels=(8, 4, 3),
-        conv_strides=(2, 2, 2),
-        latent_space_dim=420
-    )
+#     vae = VAE(
+#         input_shape=([8,512,512,1]),
+#         conv_filters=(64, 32, 16),
+#         conv_kernels=(8, 4, 3),
+#         conv_strides=(2, 2, 2),
+#         latent_space_dim=420
+#     )
 
-    # vae = VAE(
-    #     input_shape=(x_train.shape[1:]),
-    #     conv_filters=(64, 64, 64, 32, 16),
-    #     conv_kernels=(4, 2, 3, 3, 4),
-    #     conv_strides=(2, 2, 2, 1, 1),
-    #     latent_space_dim=420
-    # )
+#     # vae = VAE(
+#     #     input_shape=(x_train.shape[1:]),
+#     #     conv_filters=(64, 64, 64, 32, 16),
+#     #     conv_kernels=(4, 2, 3, 3, 4),
+#     #     conv_strides=(2, 2, 2, 1, 1),
+#     #     latent_space_dim=420
+#     # )
 
-    vae.summary()
-    keras.utils.plot_model(vae.model, show_shapes=True)
-    vae.compile()
+#     vae.summary()
+#     keras.utils.plot_model(vae.model, show_shapes=True)
+#     vae.compile()
     
-    vae.train(x_train, batch_size, num_epochs=1000, checkpoint_interval=100)
-    # vae.train2(train_data, num_epochs=10)
-    vae.save("vae_sm_vid")
-    pass
+#     vae.train(x_train, batch_size, num_epochs=1000, checkpoint_interval=100)
+#     # vae.train2(train_data, num_epochs=10)
+#     vae.save("vae_sm_vid")
+#     pass
 
