@@ -277,7 +277,7 @@ class VAE:
         else: raise Exception("Invalid loss function")
 
         kl_loss = self._kl_loss(y_true, y_pred)
-        print([type(kl_loss), kl_loss.shape])
+        # print([type(kl_loss), kl_loss.shape])
 
         # heading_loss = self._mse_loss_heading(y_true, y_pred)
 
@@ -308,8 +308,8 @@ class VAE:
         return 1-r_loss
 
     def _kl_loss(self, y_true, y_pred):
-        print([type(self.log_var.eval()), self.log_var.shape])
-        print([type(y_pred), y_pred.shape])
+        # print([type(self.log_var.eval()), self.log_var.shape])
+        # print([type(y_pred), y_pred.shape])
         kl_loss = -0.5 * K.sum(1 + self.log_var - K.square(self.mean) - K.exp(self.log_var), axis = 1)
         return kl_loss
 

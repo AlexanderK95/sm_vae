@@ -1,12 +1,12 @@
 from sm_vae import VAE
-from dataloader import load_selfmotion_vids
+from dataloader import SelfmotionDataGenerator
 import argparse
 import pandas as pd
 from create_db import CustomDataGen
 import os
 import tensorflow as tf
 import datetime
-
+import tensorflow.keras as keras
 
 
 
@@ -16,9 +16,9 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='Training parameters')
 
-    parser.add_argument('--batch-size', help='batch size')
-    parser.add_argument('--epochs', help='number of epochs')
-    parser.add_argument('--dataset-size', help='percentage of dataset to be loaded')
+    parser.add_argument('--batch-size', help='batch size', default=16)
+    parser.add_argument('--epochs', help='number of epochs', default=500)
+    # parser.add_argument('--dataset-size', help='percentage of dataset to be loaded')
     parser.add_argument('--grayscale', help='Boolean whether dataset should be loades as grayscale')
     parser.add_argument('--recon-loss', help='loss function for the reconstruction loss')
     parser.add_argument('--recon-weight', help='reconstruction loss weight')
@@ -31,7 +31,7 @@ if __name__ == "__main__":
     img_height, img_width = 256, 256
     batch_size = int(args.batch_size)
     epochs = int(args.epochs)
-    dataset_size = float(args.dataset_size)
+    # dataset_size = float(args.dataset_size)
     bw = args.grayscale == "True"
     rl = args.recon_loss
     rlw = float(args.recon_weight)
@@ -40,8 +40,8 @@ if __name__ == "__main__":
 
     suffix = args.suffix if not args.suffix==None else ""
 
-    # x_train = load_selfmotion_vids([img_height, img_width], dataset_size, bw)
-    x_train, y_train, x_test, y_test = load_selfmotion_vids("/mnt/masc_home/kressal/datasets/selfmotion/20220930-134704_1_ws.csv", video_dim, batch_size, bw=bw)
+    train_data = SelfmotionDataGenerator("/mnt/masc_home/kressal/datasets/selfmotion/20220930-134704_1_ws.csv", batch_size, video_dim, grayscale=True, shuffle=True)
+    val_data = SelfmotionDataGenerator("/mnt/masc_home/kressal/datasets/selfmotion/20220930-134704_1_ws.csv", batch_size, video_dim, grayscale=True, shuffle=True)
 
     # path = "/home/kressal/datasets/selfmotion_vids"
     # files = [os.path.join(path,fn) for fn in os.listdir(path)]
@@ -61,11 +61,9 @@ if __name__ == "__main__":
     grayscale = "bw" if bw else "color"
 
     name = f"bs_{batch_size}#ep_{epochs}#gs_{bw}#rl_{rl}#rw_{rlw}#{suffix}"
-    
-    print(x_train.shape)
 
     vae = VAE(
-        input_shape=(x_train.shape[1:]),
+        input_shape=(train_data.get_input_shape()),
         conv_filters=(64, 64, 64, 32, 16),
         conv_kernels=([2,5,5], [2,4,4], [2,3,3], [2,3,3], [2,3,3]),
         conv_strides=([1,2,2], [1,2,2], [2,2,2], [2,2,2], [2,1,1]),
@@ -82,10 +80,16 @@ if __name__ == "__main__":
     # )
 
     vae.summary()
+    # keras.utils.plot_model(vae.model, to_file="VAEdh.png", show_shapes=True)
+    # keras.utils.plot_model(vae.encoder, to_file="Encoder.png", show_shapes=True)
+    # keras.utils.plot_model(vae.decoder, to_file="Decoder.png", show_shapes=True)
+    # keras.utils.plot_model(vae.heading_decoder, to_file="Heading Decoder.png", show_shapes=True)
     vae.compile(reconstruction_loss=rl, reconstruction_weight=rlw)
     
-    vae.train(x_train, [x_train, y_train], batch_size, num_epochs=epochs, grayscale=bw, checkpoint_interval=100)
+    # vae.train(x_train, [x_train, y_train], batch_size, num_epochs=epochs, grayscale=bw, checkpoint_interval=100)
     # vae.train2(train_data, num_epochs=epochs, checkpoint_interval=int(epochs/10))
+
+    vae.train(train_data, val_data, batch_size, num_epochs=epochs, grayscale=bw, checkpoint_interval=100)
 
 
     vae.save(f"models/batch-size_{batch_size}#epochs_{epochs}#grayscale_{bw}#recon-loss_{rl}#recon-weight_{rlw}#{suffix}")

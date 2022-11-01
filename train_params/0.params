@@ -1,6 +1,5 @@
 --batch-size 16
 --epochs 2000
---dataset-size 100
 --grayscale True
 --recon-loss mse
 --recon-weight 10
