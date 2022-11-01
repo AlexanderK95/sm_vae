@@ -21,6 +21,7 @@ import skvideo
 skvideo.setFFmpegPath('/home/kressal/.conda/envs/tf/bin')
 import skvideo.io
 from tensorflow.python.framework.ops import disable_eager_execution
+from customLayers import SampleLayer
 # import dataloader as dl
 
 # from create_db import CustomDataGen
@@ -173,32 +174,6 @@ class VAE:
         )
         return history
 
-    def train2(self, train_ds, num_epochs, checkpoint_interval=50):
-        
-        model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
-            filepath="tmp/checkpoints/weights.{epoch:02d}-{loss:.2f}_"+self._reconstruction_loss+".hdf5",
-            monitor='loss',
-            verbose = 2,
-            # save_best_only=True,
-            save_weights_only=True,
-            mode='min',
-            save_freq = 'epoch',
-            period = checkpoint_interval)
-        early_stopping_callback = tf.keras.callbacks.EarlyStopping(monitor='loss')
-        self.log_dir = f"logs/fit/{self._reconstruction_loss}_" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-        self.tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=self.log_dir, histogram_freq=1)
-        self.model.fit(
-            train_ds,
-            verbose=2,
-            epochs=num_epochs,
-            callbacks=[
-                self.tensorboard_callback,
-                # early_stopping_callback,
-                model_checkpoint_callback,
-                tf.keras.callbacks.LearningRateScheduler(lambda epoch: 0.0001 * math.exp(-0.001*epoch))
-            ]
-        )
-    # @tf.function
     def _build(self):
         self._build_encoder()
         self._build_decoder()
@@ -233,16 +208,9 @@ class VAE:
         flatten = tf.keras.layers.Flatten()(x)
         self.mean = tf.keras.layers.Dense(self.latent_space_dim, name='mean')(flatten)
         self.log_var = tf.keras.layers.Dense(self.latent_space_dim, name='log_var')(flatten)
-
-        @tf.function
-        def sample_point_from_normal_distribution(args):
-            mu, log_variance = args
-            epsilon = K.random_normal(shape=K.shape(self.mean), mean=0., stddev=1.)
-            sampled_point = mu + K.exp(log_variance / 2) * epsilon
-            return tf.convert_to_tensor(sampled_point)
-
-        output = tf.keras.layers.Lambda(function=sample_point_from_normal_distribution, name="lambda")([self.mean, self.log_var])
-        self.encoder = tf.keras.Model(encoder_input, self.mean, name="Encoder")
+        
+        output = SampleLayer(name="sample_point")([self.mean, self.log_var])
+        self.encoder = tf.keras.Model(encoder_input, output, name="Encoder")
 
     def _build_decoder(self):
         num_neurons = np.prod(self._shape_before_bottleneck)

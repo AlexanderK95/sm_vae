@@ -121,8 +121,8 @@ if __name__ == "__main__":
     rl = "mse"
     rlw = 10
 
-    train_gen = SelfmotionDataGenerator("N:\\Datasets\\selfmotion\\20220930-134704_1.csv", batch_size, video_dim, grayscale=True, shuffle=True)
-    val_gen = SelfmotionDataGenerator("N:\\Datasets\\selfmotion\\20220930-134704_1.csv", batch_size, video_dim, grayscale=True, shuffle=True)
+    train_gen = SelfmotionDataGenerator("E:\\Datasets\\selfmotion\\20220930-134704_1.csv", batch_size, video_dim, grayscale=True, shuffle=True)
+    val_gen = SelfmotionDataGenerator("E:\\Datasets\\selfmotion\\20220930-134704_1.csv", batch_size, video_dim, grayscale=True, shuffle=True)
     # test = train_gen.__getitem__(0)
     # x_train, y_train, x_test, y_test = load_selfmotion_vids("N:\\Datasets\\selfmotion\\20220930-134704_1.csv", video_dim, batch_size, randomize=False)
     
@@ -155,7 +155,10 @@ if __name__ == "__main__":
     # )
 
     vae.summary()
-    keras.utils.plot_model(vae.model, show_shapes=True)
+    keras.utils.plot_model(vae.model, to_file="VAEdh.png", show_shapes=True)
+    keras.utils.plot_model(vae.encoder, to_file="Encoder.png", show_shapes=True)
+    keras.utils.plot_model(vae.decoder, to_file="Decoder.png", show_shapes=True)
+    keras.utils.plot_model(vae.heading_decoder, to_file="Heading Decoder.png", show_shapes=True)
     vae.compile(reconstruction_loss=rl, reconstruction_weight=rlw)
 
     history = vae.train(train_gen, val_gen, batch_size, num_epochs=epochs, grayscale=bw, checkpoint_interval=100)
