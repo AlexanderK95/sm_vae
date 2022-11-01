@@ -27,7 +27,7 @@ from customLayers import SampleLayer
 # from create_db import CustomDataGen
 
 # disable_eager_execution()
-tf.config.run_functions_eagerly(True)
+# tf.config.run_functions_eagerly(True)
 # os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 # tf.compat.v1.disable_eager_execution()
 # tf.config.experimental_run_functions_eagerly(True)
@@ -154,7 +154,7 @@ class VAE:
         early_stopping_callback = tf.keras.callbacks.EarlyStopping(monitor='loss')
         self.log_dir = f"logs/fit/{self.name}_" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
         self.tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=self.log_dir, histogram_freq=1)
-        history = self.model.fit(
+        self.model.fit(
             train_gen,
             # y={
             #    "Decoder": [None, self.input_shape[0], self.input_shape[1], self.input_shape[2], self.input_shape[3]],
@@ -172,7 +172,6 @@ class VAE:
                 tf.keras.callbacks.LearningRateScheduler(lambda epoch: 0.0001 * math.exp(-0.001*epoch))
             ]
         )
-        return history
 
     def _build(self):
         self._build_encoder()
@@ -204,13 +203,12 @@ class VAE:
 
         # Final Block
         self._shape_before_bottleneck = K.int_shape(x)[1:]
-        # print(self._shape_before_bottleneck)
         flatten = tf.keras.layers.Flatten()(x)
         self.mean = tf.keras.layers.Dense(self.latent_space_dim, name='mean')(flatten)
         self.log_var = tf.keras.layers.Dense(self.latent_space_dim, name='log_var')(flatten)
-        
-        output = SampleLayer(name="sample_point")([self.mean, self.log_var])
-        self.encoder = tf.keras.Model(encoder_input, output, name="Encoder")
+
+        # output = SampleLayer(name="sample_point")([self.mean, self.log_var])
+        self.encoder = tf.keras.Model(encoder_input, self.mean, name="Encoder")
 
     def _build_decoder(self):
         num_neurons = np.prod(self._shape_before_bottleneck)
@@ -261,7 +259,6 @@ class VAE:
         embedding = self.encoder(model_input)
         model_output_heading = self.heading_decoder(embedding)
         model_output_recon = self.decoder(embedding)
-
         # model_output_heading = self.heading_decoder(self.encoder(model_input))
         # test_layer = tf.keras.Input(shape=model_input.shape, name='input_layer')
         # test_out = tf.keras.layers.Dense(3,'relu')(test_layer)
@@ -269,17 +266,15 @@ class VAE:
         self.model = tf.keras.Model(inputs=model_input, outputs=[model_output_recon, model_output_heading], name="VAE_hd")
 
     def _combined_loss(self, y_true, y_pred):
-        # print(type(y_pred))
-        # print(type(y_true))
+        print(["y_pred", type(y_pred), y_pred.shape])
+        print(["y_true", type(y_true), y_true.shape])
         if self._reconstruction_loss == "mse": reconstruction_loss = self._mse_loss(y_true, y_pred)
         elif self._reconstruction_loss == "psnr": reconstruction_loss = self._psnr_loss(y_true, y_pred)
         elif self._reconstruction_loss == "ssmi": reconstruction_loss = self._ssmi_loss(y_true, y_pred)
         else: raise Exception("Invalid loss function")
 
         kl_loss = self._kl_loss(y_true, y_pred)
-        # print([type(kl_loss), kl_loss.shape])
-
-        # heading_loss = self._mse_loss_heading(y_true, y_pred)
+        print(["kl_loss", type(kl_loss), kl_loss.shape])
 
         combined_loss = self.reconstruction_loss_weight * reconstruction_loss + kl_loss
         return combined_loss
@@ -307,9 +302,10 @@ class VAE:
         r_loss = K.mean(ssmi, axis=None)
         return 1-r_loss
 
+    @tf.function
     def _kl_loss(self, y_true, y_pred):
-        # print([type(self.log_var.eval()), self.log_var.shape])
-        # print([type(y_pred), y_pred.shape])
+        print(["self.log_var", type(self.log_var), self.log_var.shape])
+        print(["self.mean", type(self.mean), self.mean.shape])
         kl_loss = -0.5 * K.sum(1 + self.log_var - K.square(self.mean) - K.exp(self.log_var), axis = 1)
         return kl_loss
 

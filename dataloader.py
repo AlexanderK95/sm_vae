@@ -138,10 +138,10 @@ if __name__ == "__main__":
 
     vae = VAE(
         input_shape=(train_gen.get_input_shape()),
-        conv_filters=(64, 32, 16),
-        conv_kernels=([2,5,5], [2,4,4], [2,3,3]),
-        conv_strides=([1,4,4], [1,4,4], [2,2,2]),
-        latent_space_dim=180,
+        conv_filters=(16, 8),
+        conv_kernels=([2,5,5], [2,3,3]),
+        conv_strides=([2,16,16], [2,2,2]),
+        latent_space_dim=60,
         name="test"
     )
 
@@ -161,6 +161,6 @@ if __name__ == "__main__":
     keras.utils.plot_model(vae.heading_decoder, to_file="Heading Decoder.png", show_shapes=True)
     vae.compile(reconstruction_loss=rl, reconstruction_weight=rlw)
 
-    history = vae.train(train_gen, val_gen, batch_size, num_epochs=epochs, grayscale=bw, checkpoint_interval=100)
+    vae.train(train_gen, val_gen, batch_size, num_epochs=epochs, grayscale=bw, checkpoint_interval=100)
 
     pass

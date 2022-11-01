@@ -9,4 +9,4 @@ class SampleLayer(tf.keras.layers.Layer):
         mu, log_variance = inputs
         epsilon = K.random_normal(shape=K.shape(mu), mean=0., stddev=1.)
         sampled_point = mu + K.exp(log_variance / 2) * epsilon
-        return sampled_point
+        return tf.convert_to_tensor(sampled_point)
