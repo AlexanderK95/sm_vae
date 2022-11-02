@@ -1,27 +1,27 @@
 # print("inside vae.py")
 import os
-import time
-import imageio
+# import time
+# import imageio
 import numpy as np
 # from sklearn.manifold import TSNE
 # import matplotlib.pyplot as plt
 import pickle
 import tensorflow as tf
-# from keras import layers
 from tensorflow.keras import backend as K
-import tensorflow.keras as keras
+# from keras import layers
+# import tensorflow.keras as keras
 # from IPython import display
 import datetime
 import math
-
-from PIL import Image
-import glob
-import random
-import skvideo
-skvideo.setFFmpegPath('/home/kressal/.conda/envs/tf/bin')
-import skvideo.io
-from tensorflow.python.framework.ops import disable_eager_execution
 from customLayers import SampleLayer
+
+# from PIL import Image
+# import glob
+# import random
+# import skvideo
+# skvideo.setFFmpegPath('/home/kressal/.conda/envs/tf/bin')
+# import skvideo.io
+# from tensorflow.python.framework.ops import disable_eager_execution
 # import dataloader as dl
 
 # from create_db import CustomDataGen
@@ -207,8 +207,10 @@ class VAE:
         self.mean = tf.keras.layers.Dense(self.latent_space_dim, name='mean')(flatten)
         self.log_var = tf.keras.layers.Dense(self.latent_space_dim, name='log_var')(flatten)
 
-        # output = SampleLayer(name="sample_point")([self.mean, self.log_var])
-        self.encoder = tf.keras.Model(encoder_input, self.mean, name="Encoder")
+        self.embedding_stats = tf.keras.Model(encoder_input, [self.mean, self.log_var], name="embedding_stats")
+
+        output = SampleLayer(name="sample_point")([self.mean, self.log_var])
+        self.encoder = tf.keras.Model(encoder_input, output, name="Encoder")
 
     def _build_decoder(self):
         num_neurons = np.prod(self._shape_before_bottleneck)
@@ -306,7 +308,12 @@ class VAE:
     def _kl_loss(self, y_true, y_pred):
         print(["self.log_var", type(self.log_var), self.log_var.shape])
         print(["self.mean", type(self.mean), self.mean.shape])
-        kl_loss = -0.5 * K.sum(1 + self.log_var - K.square(self.mean) - K.exp(self.log_var), axis = 1)
+
+        mean, log_var = self.embedding_stats(self._model_input)
+        print(["model.mean", type(mean), mean.shape])
+        print(["model.log_var", type(log_var), log_var.shape])
+
+        kl_loss = -0.5 * tf.math.reduce_sum(1 + self.log_var - tf.math.square(self.mean) - tf.math.exp(self.log_var), axis = 1)
         return kl_loss
 
     def _create_folder_if_it_doesnt_exist(self, folder):
