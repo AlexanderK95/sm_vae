@@ -106,16 +106,18 @@ class VAE:
         else: raise Exception("Invalid loss function, currently supported are: mse, psnr and ssmi")
 
         losses = {
-            "Decoder": self._combined_loss,
+            "Decoder": 'mse',
+            "emembedding_stats": tf.keras.losses.KLDivergence(),
             "Heading_Decoder": 'mse'
         }
         lossWeights = {
             "Decoder": 1.0,
+            "emembedding_stats": 1.0,
             "Heading_Decoder": 1.0
         }
         metrics = {
             "Decoder": 'mse',
-            # "Decoder": [rl, self._kl_loss],
+            "emembedding_stats": tf.keras.losses.KLDivergence(),
             "Heading_Decoder": 'accuracy'
         }
 
@@ -206,7 +208,7 @@ class VAE:
         flatten = tf.keras.layers.Flatten()(x)
         self.mean = tf.keras.layers.Dense(self.latent_space_dim, name='mean')(flatten)
         self.log_var = tf.keras.layers.Dense(self.latent_space_dim, name='log_var')(flatten)
-
+        
         self.embedding_stats = tf.keras.Model(encoder_input, [self.mean, self.log_var], name="embedding_stats")
 
         output = SampleLayer(name="sample_point")([self.mean, self.log_var])
@@ -259,13 +261,15 @@ class VAE:
     def _build_autoencoder(self):
         model_input = self._model_input
         embedding = self.encoder(model_input)
+        embedding_stats = self.embedding_stats(model_input)
         model_output_heading = self.heading_decoder(embedding)
         model_output_recon = self.decoder(embedding)
         # model_output_heading = self.heading_decoder(self.encoder(model_input))
         # test_layer = tf.keras.Input(shape=model_input.shape, name='input_layer')
         # test_out = tf.keras.layers.Dense(3,'relu')(test_layer)
         self.vae = tf.keras.Model(inputs=model_input, outputs=model_output_recon, name="VAE")
-        self.model = tf.keras.Model(inputs=model_input, outputs=[model_output_recon, model_output_heading], name="VAE_hd")
+        self.model = tf.keras.Model(inputs=model_input, outputs=[model_output_recon, model_output_heading, embedding_stats], name="VAE_hd")
+        
 
     def _combined_loss(self, y_true, y_pred):
         print(["y_pred", type(y_pred), y_pred.shape])

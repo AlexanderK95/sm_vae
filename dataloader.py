@@ -159,6 +159,7 @@ if __name__ == "__main__":
     keras.utils.plot_model(vae.encoder, to_file="Encoder.png", show_shapes=True)
     keras.utils.plot_model(vae.decoder, to_file="Decoder.png", show_shapes=True)
     keras.utils.plot_model(vae.heading_decoder, to_file="Heading Decoder.png", show_shapes=True)
+    # keras.utils.plot_model(vae.embedding_stats, to_file="self.embedding_stats.png", show_shapes=True)
     vae.compile(reconstruction_loss=rl, reconstruction_weight=rlw)
 
     vae.train(train_gen, val_gen, batch_size, num_epochs=epochs, grayscale=bw, checkpoint_interval=100)
