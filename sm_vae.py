@@ -106,18 +106,18 @@ class VAE:
         else: raise Exception("Invalid loss function, currently supported are: mse, psnr and ssmi")
 
         losses = {
-            "Decoder": 'mse',
-            "emembedding_stats": tf.keras.losses.KLDivergence(),
+            "Decoder": self._combined_loss,
+            # "emembedding_stats": tf.keras.losses.KLDivergence(),
             "Heading_Decoder": 'mse'
         }
         lossWeights = {
             "Decoder": 1.0,
-            "emembedding_stats": 1.0,
-            "Heading_Decoder": 1.0
+            # "emembedding_stats": 1.0,
+            "Heading_Decoder": 0.
         }
         metrics = {
-            "Decoder": 'mse',
-            "emembedding_stats": tf.keras.losses.KLDivergence(),
+            "Decoder": 'accuracy',
+            # "emembedding_stats": tf.keras.losses.KLDivergence(),
             "Heading_Decoder": 'accuracy'
         }
 
@@ -135,7 +135,7 @@ class VAE:
             #         ]
         )
 
-    def train(self, train_gen, validation_gen, batch_size, num_epochs, grayscale, checkpoint_interval=50):
+    def train(self, train_gen, validation_gen, batch_size, num_epochs, grayscale, checkpoint_interval=1500, verbosity=1):
         bw = "gray" if grayscale else "color"
         
         
@@ -146,11 +146,11 @@ class VAE:
         model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
             filepath="tmp/checkpoints/weights.{epoch:02d}-{loss:.2f}_"+self.name+".hdf5",
             monitor='loss',
-            verbose = 4,
+            verbose = verbosity,
             # save_best_only=True,
             save_weights_only=True,
             # mode='min',
-            save_freq = 1500,
+            save_freq = checkpoint_interval,
             # period = checkpoint_interval
         )
         early_stopping_callback = tf.keras.callbacks.EarlyStopping(monitor='loss')
@@ -164,7 +164,7 @@ class VAE:
             # },
             validation_data=validation_gen,
             # batch_size=batch_size,
-            verbose = 4,
+            verbose = verbosity,
             epochs=num_epochs,
             shuffle=True,
             callbacks=[
@@ -209,7 +209,7 @@ class VAE:
         self.mean = tf.keras.layers.Dense(self.latent_space_dim, name='mean')(flatten)
         self.log_var = tf.keras.layers.Dense(self.latent_space_dim, name='log_var')(flatten)
         
-        self.embedding_stats = tf.keras.Model(encoder_input, [self.mean, self.log_var], name="embedding_stats")
+        # self.embedding_stats = tf.keras.Model(encoder_input, [self.mean, self.log_var], name="embedding_stats")
 
         output = SampleLayer(name="sample_point")([self.mean, self.log_var])
         self.encoder = tf.keras.Model(encoder_input, output, name="Encoder")
@@ -261,29 +261,29 @@ class VAE:
     def _build_autoencoder(self):
         model_input = self._model_input
         embedding = self.encoder(model_input)
-        embedding_stats = self.embedding_stats(model_input)
+        # embedding_stats = self.embedding_stats(model_input)
         model_output_heading = self.heading_decoder(embedding)
         model_output_recon = self.decoder(embedding)
         # model_output_heading = self.heading_decoder(self.encoder(model_input))
         # test_layer = tf.keras.Input(shape=model_input.shape, name='input_layer')
         # test_out = tf.keras.layers.Dense(3,'relu')(test_layer)
         self.vae = tf.keras.Model(inputs=model_input, outputs=model_output_recon, name="VAE")
-        self.model = tf.keras.Model(inputs=model_input, outputs=[model_output_recon, model_output_heading, embedding_stats], name="VAE_hd")
+        self.model = tf.keras.Model(inputs=model_input, outputs=[model_output_recon, model_output_heading], name="VAE_hd")
         
 
     def _combined_loss(self, y_true, y_pred):
-        print(["y_pred", type(y_pred), y_pred.shape])
-        print(["y_true", type(y_true), y_true.shape])
+        # print(["y_pred", type(y_pred), y_pred.shape])
+        # print(["y_true", type(y_true), y_true.shape])
         if self._reconstruction_loss == "mse": reconstruction_loss = self._mse_loss(y_true, y_pred)
         elif self._reconstruction_loss == "psnr": reconstruction_loss = self._psnr_loss(y_true, y_pred)
         elif self._reconstruction_loss == "ssmi": reconstruction_loss = self._ssmi_loss(y_true, y_pred)
         else: raise Exception("Invalid loss function")
 
         kl_loss = self._kl_loss(y_true, y_pred)
-        print(["kl_loss", type(kl_loss), kl_loss.shape])
+        # print(["kl_loss", type(kl_loss), kl_loss.shape])
 
-        combined_loss = self.reconstruction_loss_weight * reconstruction_loss + kl_loss
-        return combined_loss
+        combined_loss = self.reconstruction_loss_weight * reconstruction_loss
+        return reconstruction_loss
 
     def _mse_loss(self, y_true, y_pred):
         # print([type(y_pred), y_pred.shape])
@@ -308,14 +308,14 @@ class VAE:
         r_loss = K.mean(ssmi, axis=None)
         return 1-r_loss
 
-    @tf.function
+    # @tf.function
     def _kl_loss(self, y_true, y_pred):
-        print(["self.log_var", type(self.log_var), self.log_var.shape])
-        print(["self.mean", type(self.mean), self.mean.shape])
+        # print(["self.log_var", type(self.log_var), self.log_var.shape])
+        # print(["self.mean", type(self.mean), self.mean.shape])
 
-        mean, log_var = self.embedding_stats(self._model_input)
-        print(["model.mean", type(mean), mean.shape])
-        print(["model.log_var", type(log_var), log_var.shape])
+        # mean, log_var = self.embedding_stats(self._model_input)
+        # print(["model.mean", type(mean), mean.shape])
+        # print(["model.log_var", type(log_var), log_var.shape])
 
         kl_loss = -0.5 * tf.math.reduce_sum(1 + self.log_var - tf.math.square(self.mean) - tf.math.exp(self.log_var), axis = 1)
         return kl_loss

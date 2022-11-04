@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import tensorflow as tf
 import skvideo.io
-from dataloader import load_selfmotion_vids
+from dataloader import SelfmotionDataGenerator
 from sm_vae import VAE
 from sm_vae_c2 import VAE as VAE_c2
 import os
@@ -60,7 +60,9 @@ def plot_images_encoded_in_latent_space(latent_representations, sample_labels):
     plt.colorbar()
     plt.show()
 
-def select_videos(videos, num_vid=10):
+def select_videos(gen, num_vid=10):
+    gen.on_epoch_end()
+    videos = gen.__getitem__(0)[0]
     sample_vids_index = np.random.choice(range(len(videos)), num_vid)
     sample_videos = videos[sample_vids_index]
     return sample_videos
@@ -75,9 +77,10 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='Training parameters')
 
-    parser.add_argument('--model', help='folder containing parameters and weights of the model')
+    parser.add_argument('--model', help='folder containing parameters and weights of the model', default="models\\batch-size_16#epochs_250#grayscale_True#recon-loss_mse#recon-weight_10#test")
     # parser.add_argument('--out', help='name for output files')
-    parser.add_argument('--grayscale', help='Boolean whether dataset should be loades as grayscale')
+    parser.add_argument('--grayscale', help='Boolean whether dataset should be loades as grayscale', default="True")
+    parser.add_argument('--latent_dim', help='Boolean whether dataset should be loades as grayscale', default="180")
 
     args = parser.parse_args()
 
@@ -95,7 +98,7 @@ if __name__ == "__main__":
 
     video_dim = [8, 512, 512]
     batch_size = 16
-    x_train, y_train, x_test, y_test = load_selfmotion_vids("/mnt/masc_home/kressal/datasets/selfmotion/20220930-134704_1.csv", video_dim, batch_size, bw=bw)
+    x_test = SelfmotionDataGenerator("N:\\Datasets\\selfmotion\\20220930-134704_1.csv", batch_size, video_dim, grayscale=bw, shuffle=True)
 
     print("###################################################")
     print(args.model)
@@ -103,7 +106,7 @@ if __name__ == "__main__":
     print(output_name)
     
     print("Reconstruction")
-    num_sample_videos_to_show = 3
+    num_sample_videos_to_show = batch_size
     sample_videos = select_videos(x_test, num_sample_videos_to_show)
     reconstructed_videos, latent_points, headings = autoencoder.reconstruct(sample_videos)
     # reconstructed_videos_c2, latent_points_c2 = autoencoder_c2.reconstruct(sample_videos)
@@ -158,7 +161,7 @@ if __name__ == "__main__":
 
     print("Prediction")
     num_samples = 10
-    latent_points = np.array([[random.uniform(-4, 4) for j in range(420)] for i in range(num_samples)])
+    latent_points = np.array([[random.uniform(-4, 4) for j in range(int(args.latent_dim))] for i in range(num_samples)])
     # latent_points = np.array([random.uniform(-4, 4) for j in range(200)])
     print(latent_points.shape)
     new_videos = autoencoder.decoder.predict(latent_points)

@@ -11,6 +11,7 @@ from sm_vae import VAE
 import matplotlib.pyplot as plt
 import tensorflow as tf
 import tensorflow.keras as keras
+import time
 
 def shuffle_along_axis(a, axis):
     idx = np.random.rand(*a.shape).argsort(axis=axis)
@@ -65,13 +66,14 @@ def load_selfmotion_vids(path, video_dim, batch_size=32, train_split=0.8, bw=Tru
 
 
 class SelfmotionDataGenerator(tf.keras.utils.Sequence):
-    def __init__(self, path, batch_size, input_shape=[8, 512, 512], grayscale=True, shuffle=True):
+    def __init__(self, path, batch_size, input_shape=[8, 512, 512], rescale=False, grayscale=True, shuffle=True):
         self.base_path = os.path.dirname(path)
         self.data = pd.read_csv(f"{path}", sep=",")
         self.batch_size = batch_size
         self.input_shape = input_shape
         self.grayscale = grayscale
         self.shuffle = shuffle
+        self.rescale = rescale
 
         self.n = self.data.shape[0]
 
@@ -80,12 +82,18 @@ class SelfmotionDataGenerator(tf.keras.utils.Sequence):
               else np.empty([batch.shape[0], self.input_shape[0], self.input_shape[1], self.input_shape[2], 1], dtype=np.float32)
 
         for i in np.arange(batch.shape[0]):
-            out[i] = sk.vread(os.path.join(self.base_path, batch["file_head"][i])).squeeze().astype("float32")/255. if not self.grayscale \
+            vid = sk.vread(os.path.join(self.base_path, batch["file_head"][i])).squeeze().astype("float32")/255. if not self.grayscale \
                      else sk.vread(os.path.join(self.base_path, batch["file_head"][i]), as_grey=True).astype("float32")/255.
+            if vid.shape[:-1] != tuple(self.input_shape):
+                # print("Input shape does not match video dimensions. Rescaling input to match input shape!")
+                for n in np.arange(vid.shape[0]):
+                    out[i,n] = tf.image.resize(vid[n], [self.input_shape[1], self.input_shape[2]], antialias=True)
+                continue
+            out[i] = vid
         return out
 
     def __get_output(self, batch):
-        return batch.loc[:,"velX": "roll"].to_numpy()
+        return batch.loc[:,"velX": "roll"].to_numpy() / np.array([1, 1, 1, 180, 180, 180])
 
     def __get_data(self, indices):
         batch = self.data.iloc[indices].reset_index(drop=True)
@@ -106,62 +114,85 @@ class SelfmotionDataGenerator(tf.keras.utils.Sequence):
     def __getitem__(self, index):
         indices = np.arange(index * self.batch_size, (index + 1) * self.batch_size)
         X, y = self.__get_data(indices)        
-        return X, tuple([X, y])
+        return X, [X, y]
     
     def __len__(self):
         return self.n // self.batch_size
 
 
-if __name__ == "__main__":
-    img_height, img_width = 512, 512
-    batch_size = 8
-    epochs = 5
-    video_dim = [8, 512, 512]
-    bw = True
-    rl = "mse"
-    rlw = 10
+# if __name__ == "__main__":
+#     img_height, img_width = 512, 512
+#     batch_size = 16
+#     epochs = 250
+#     video_dim = [8, 256, 256]
+#     bw = True
+#     rl = "mse"
+#     rlw = 10
 
-    train_gen = SelfmotionDataGenerator("E:\\Datasets\\selfmotion\\20220930-134704_1.csv", batch_size, video_dim, grayscale=True, shuffle=True)
-    val_gen = SelfmotionDataGenerator("E:\\Datasets\\selfmotion\\20220930-134704_1.csv", batch_size, video_dim, grayscale=True, shuffle=True)
-    # test = train_gen.__getitem__(0)
-    # x_train, y_train, x_test, y_test = load_selfmotion_vids("N:\\Datasets\\selfmotion\\20220930-134704_1.csv", video_dim, batch_size, randomize=False)
+#     train_gen = SelfmotionDataGenerator("N:\\Datasets\\selfmotion\\20220930-134704_1.csv", batch_size, video_dim, grayscale=True, shuffle=True)
+#     val_gen = SelfmotionDataGenerator("N:\\Datasets\\selfmotion\\20220930-134704_1.csv", batch_size, video_dim, grayscale=True, shuffle=True)
+#     test = train_gen.__getitem__(0)
+
+#     # n = 100
+
+#     # start = time.time()
+#     # start_p = time.process_time()
+#     # for i in tqdm(np.arange(n)):
+#     #     SelfmotionDataGenerator("N:/Datasets/selfmotion/20220930-134704_1.csv", batch_size, video_dim, grayscale=True, shuffle=True)
+#     # end = time.time()
+#     # end_p = time.process_time()
+#     # result1 = end-start
+#     # result1_p = end_p-start_p
+
+#     # start = time.time()
+#     # start_p = time.process_time()
+#     # for i in tqdm(np.arange(n)):
+#     #     train_gen.__getitem__(0)
+#     # end = time.time()
+#     # end_p = time.process_time()
+#     # result2 = end-start
+#     # result2_p = end_p-start_p
+#     # print(f"Execution time (Datagen) is {result1 / n} seconds ({result1_p / n} seconds CPU time)")
+#     # print(f"Execution time (fetching batch) is {result2 / n} seconds ({result2_p / n} seconds CPU time)")
+
+#     # x_train, y_train, x_test, y_test = load_selfmotion_vids("N:\\Datasets\\selfmotion\\20220930-134704_1.csv", video_dim, batch_size, randomize=False)
     
-    # image1 = test[0][0,0,:]
-    # image2 = x_train[0,0,:]
+#     # image1 = test[0][0,0,:]
+#     # image2 = x_train[0,0,:]
 
-    # plt.figure()
-    # plt.imshow(image1)
-    # plt.figure()
-    # plt.imshow(image2)
-    # plt.show()
+#     # plt.figure()
+#     # plt.imshow(image1)
+#     # plt.figure()
+#     # plt.imshow(image2)
+#     # plt.show()
 
 
-    vae = VAE(
-        input_shape=(train_gen.get_input_shape()),
-        conv_filters=(16, 8),
-        conv_kernels=([2,5,5], [2,3,3]),
-        conv_strides=([2,16,16], [2,2,2]),
-        latent_space_dim=60,
-        name="test"
-    )
+#     vae = VAE(
+#         input_shape=(train_gen.get_input_shape()),
+#         conv_filters=(64, 32, 16),
+#         conv_kernels=([2,6,6], [2,4,3], [2,4,3]),
+#         conv_strides=([2,4,4], [2,2,2], [1,2,2]),
+#         latent_space_dim=180,
+#         name="test"
+#     )
 
-    # vae = VAE(
-    #     input_shape=(x_train.shape[1:]),
-    #     conv_filters=(64, 64, 64, 32, 16),
-    #     conv_kernels=([2,5,5], [2,4,4], [2,3,3], [2,3,3], [2,3,3]),
-    #     conv_strides=([1,2,2], [1,2,2], [2,2,2], [2,2,2], [2,1,1]),
-    #     latent_space_dim=420,
-    #     name="test"
-    # )
+#     # vae = VAE(
+#     #     input_shape=(x_train.shape[1:]),
+#     #     conv_filters=(64, 64, 64, 32, 16),
+#     #     conv_kernels=([2,5,5], [2,4,4], [2,3,3], [2,3,3], [2,3,3]),
+#     #     conv_strides=([1,2,2], [1,2,2], [2,2,2], [2,2,2], [2,1,1]),
+#     #     latent_space_dim=420,
+#     #     name="test"
+#     # )
 
-    vae.summary()
-    keras.utils.plot_model(vae.model, to_file="VAEdh.png", show_shapes=True)
-    keras.utils.plot_model(vae.encoder, to_file="Encoder.png", show_shapes=True)
-    keras.utils.plot_model(vae.decoder, to_file="Decoder.png", show_shapes=True)
-    keras.utils.plot_model(vae.heading_decoder, to_file="Heading Decoder.png", show_shapes=True)
-    # keras.utils.plot_model(vae.embedding_stats, to_file="self.embedding_stats.png", show_shapes=True)
-    vae.compile(reconstruction_loss=rl, reconstruction_weight=rlw)
+#     vae.summary()
+#     keras.utils.plot_model(vae.model, to_file="VAEdh.png", show_shapes=True)
+#     keras.utils.plot_model(vae.encoder, to_file="Encoder.png", show_shapes=True)
+#     keras.utils.plot_model(vae.decoder, to_file="Decoder.png", show_shapes=True)
+#     keras.utils.plot_model(vae.heading_decoder, to_file="Heading Decoder.png", show_shapes=True)
+#     # keras.utils.plot_model(vae.embedding_stats, to_file="self.embedding_stats.png", show_shapes=True)
+#     vae.compile(reconstruction_loss=rl, reconstruction_weight=rlw)
 
-    vae.train(train_gen, val_gen, batch_size, num_epochs=epochs, grayscale=bw, checkpoint_interval=100)
-
-    pass
+#     vae.train(train_gen, val_gen, batch_size, num_epochs=epochs, grayscale=bw, checkpoint_interval=100)
+#     vae.save(f"models/batch-size_{batch_size}#epochs_{epochs}#grayscale_{bw}#recon-loss_{rl}#recon-weight_{rlw}#test")
+#     pass
