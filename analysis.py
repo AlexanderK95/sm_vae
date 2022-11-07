@@ -79,7 +79,7 @@ if __name__ == "__main__":
     parser.add_argument('--model', help='folder containing parameters and weights of the model', default="models\\batch-size_16#epochs_250#grayscale_True#recon-loss_mse#recon-weight_10#test")
     # parser.add_argument('--out', help='name for output files')
     parser.add_argument('--grayscale', help='Boolean whether dataset should be loades as grayscale', default="True")
-    parser.add_argument('--latent_dim', help='Boolean whether dataset should be loades as grayscale', default="180")
+    # parser.add_argument('--latent_dim', help='Boolean whether dataset should be loades as grayscale', default=None)
 
     args = parser.parse_args()
 
@@ -91,6 +91,7 @@ if __name__ == "__main__":
         sys.exit()
 
     autoencoder = VAE.load(args.model)
+    latent_dim = autoencoder.latent_space_dim
     # autoencoder_c2 = VAE_c2.load("vae_sm_vid_c2")
     # autoencoder.summary()
     # autoencoder_c2.summary()
@@ -161,7 +162,7 @@ if __name__ == "__main__":
 
     print("Prediction")
     num_samples = 10
-    latent_points = np.array([[random.uniform(-4, 4) for j in range(int(args.latent_dim))] for i in range(num_samples)])
+    latent_points = np.array([[random.uniform(-4, 4) for j in range(int(latent_dim))] for i in range(num_samples)])
     # latent_points = np.array([random.uniform(-4, 4) for j in range(200)])
     print(latent_points.shape)
     new_videos = autoencoder.decoder.predict(latent_points)
