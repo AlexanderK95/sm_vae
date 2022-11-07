@@ -13,7 +13,6 @@ import argparse
 
 
 # os.environ['CUDA_VISIBLE_DEVICES'] = '0'
-tf.compat.v1.disable_eager_execution()
 
 
 def select_images(images, labels, num_images=10):
@@ -99,6 +98,7 @@ if __name__ == "__main__":
     video_dim = [8, img_height, img_width]
     batch_size = 16
     x_test = SelfmotionDataGenerator("/mnt/masc_home/kressal/datasets/selfmotion/20220930-134704_1.csv", batch_size, video_dim, grayscale=bw, shuffle=True)
+    # x_test = SelfmotionDataGenerator("N:\\Datasets\\selfmotion\\20220930-134704_1.csv", batch_size, video_dim, grayscale=bw, shuffle=True)
 
     print("###################################################")
     print(args.model)

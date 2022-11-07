@@ -88,6 +88,7 @@ class SelfmotionDataGenerator(tf.keras.utils.Sequence):
             if vid.shape[:-1] != tuple(self.input_shape):
                 # print("Input shape does not match video dimensions. Rescaling input to match input shape!")
                 for n in np.arange(vid.shape[0]):
+                    
                     out[i,n] = tf.image.resize(vid[n], [self.input_shape[1], self.input_shape[2]], antialias=True)
                 continue
             out[i] = vid
