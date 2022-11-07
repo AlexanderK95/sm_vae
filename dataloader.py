@@ -125,15 +125,15 @@ class SelfmotionDataGenerator(tf.keras.utils.Sequence):
 # if __name__ == "__main__":
 #     img_height, img_width = 512, 512
 #     batch_size = 16
-#     epochs = 250
+#     epochs = 50
 #     video_dim = [8, 256, 256]
 #     bw = True
-#     rl = "mse"
-#     rlw = 10
+#     reconstruction_loss = "mse"
+#     heading_weight = 0
 
 #     train_gen = SelfmotionDataGenerator("N:\\Datasets\\selfmotion\\20220930-134704_1.csv", batch_size, video_dim, grayscale=True, shuffle=True)
 #     val_gen = SelfmotionDataGenerator("N:\\Datasets\\selfmotion\\20220930-134704_1.csv", batch_size, video_dim, grayscale=True, shuffle=True)
-#     test = train_gen.__getitem__(0)
+#     # test = train_gen.__getitem__(0)
 
 #     n = 100
 
@@ -193,8 +193,8 @@ class SelfmotionDataGenerator(tf.keras.utils.Sequence):
 #     keras.utils.plot_model(vae.decoder, to_file="Decoder.png", show_shapes=True)
 #     keras.utils.plot_model(vae.heading_decoder, to_file="Heading Decoder.png", show_shapes=True)
 #     # keras.utils.plot_model(vae.embedding_stats, to_file="self.embedding_stats.png", show_shapes=True)
-#     vae.compile(reconstruction_loss=rl, reconstruction_weight=rlw)
+#     vae.compile(reconstruction_loss=reconstruction_loss, heading_weight=heading_weight)
 
 #     vae.train(train_gen, val_gen, batch_size, num_epochs=epochs, grayscale=bw, checkpoint_interval=100)
-#     vae.save(f"models/batch-size_{batch_size}#epochs_{epochs}#grayscale_{bw}#recon-loss_{rl}#recon-weight_{rlw}#test")
+#     vae.save(f"models/batch-size_{batch_size}#epochs_{epochs}#grayscale_{bw}#recon-loss_{reconstruction_loss}#heading-weight_{heading_weight}#test")
 #     pass

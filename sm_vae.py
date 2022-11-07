@@ -14,6 +14,7 @@ from tensorflow.keras import backend as K
 import datetime
 import math
 from customLayers import SampleLayer
+from customLayers import KL_Layer
 
 # from PIL import Image
 # import glob
@@ -36,7 +37,7 @@ from customLayers import SampleLayer
 
 
 class VAE:
-    def __init__(self,input_shape, conv_filters, conv_kernels, conv_strides, latent_space_dim, name="not_set", data_train=None, data_val=None):
+    def __init__(self,input_shape, conv_filters, conv_kernels, conv_strides, latent_space_dim, name="not_set", kl_weight=4.5e-6, data_train=None, data_val=None):
         print("initializing vae...")
         self.input_shape = input_shape # [28, 28, 1]
         self.conv_filters = conv_filters # [2, 4, 8]
@@ -44,7 +45,7 @@ class VAE:
         self.conv_strides = conv_strides # [1, 2, 2]
         self.latent_space_dim = latent_space_dim # 2
         self.name = name
-        self.reconstruction_loss_weight = 10000
+        self.kl_weight = kl_weight
 
         self.data_train = data_train
         self.data_val = data_val
@@ -99,9 +100,9 @@ class VAE:
         self.vae.summary()
         self.model.summary()
 
-    def compile(self, reconstruction_loss="mse", reconstruction_weight=1000, learning_rate=0.0001):
+    def compile(self, reconstruction_loss="mse", heading_weight=4.5e-1, learning_rate=0.0001):
         self._reconstruction_loss = reconstruction_loss
-        self.reconstruction_loss_weight = reconstruction_weight
+        self.heading_weight = heading_weight
         # optimizer = Adam(learning_rate=learning_rate)
         if reconstruction_loss == "mse": rl = self._mse_loss
         elif reconstruction_loss == "psnr": rl = self._psnr_loss
@@ -109,14 +110,14 @@ class VAE:
         else: raise Exception("Invalid loss function, currently supported are: mse, psnr and ssmi")
 
         losses = {
-            "Decoder": self._combined_loss,
+            "Decoder": 'mse',
             # "emembedding_stats": tf.keras.losses.KLDivergence(),
             "Heading_Decoder": 'mse'
         }
         lossWeights = {
             "Decoder": 1.0,
             # "emembedding_stats": 1.0,
-            "Heading_Decoder": 0.
+            "Heading_Decoder":self.heading_weight
         }
         metrics = {
             "Decoder": 'accuracy',
@@ -138,7 +139,7 @@ class VAE:
             #         ]
         )
 
-    def train(self, train_gen, validation_gen, batch_size, num_epochs, grayscale, checkpoint_interval=1500, verbosity=1):
+    def train(self, train_gen, validation_gen, num_epochs, grayscale, checkpoint_interval=1500, verbosity=1):
         bw = "gray" if grayscale else "color"
         
         self.data_train = train_gen.path
@@ -213,6 +214,7 @@ class VAE:
         self.mean = tf.keras.layers.Dense(self.latent_space_dim, name='mean')(flatten)
         self.log_var = tf.keras.layers.Dense(self.latent_space_dim, name='log_var')(flatten)
         
+        self.mean, self.log_var = KL_Layer()([self.mean, self.log_var], fact=self.kl_weight)
         # self.embedding_stats = tf.keras.Model(encoder_input, [self.mean, self.log_var], name="embedding_stats")
 
         output = SampleLayer(name="sample_point")([self.mean, self.log_var])
@@ -286,7 +288,7 @@ class VAE:
         kl_loss = self._kl_loss(y_true, y_pred)
         # print(["kl_loss", type(kl_loss), kl_loss.shape])
 
-        combined_loss = self.reconstruction_loss_weight * reconstruction_loss
+        combined_loss = self.kl_weight * reconstruction_loss
         return reconstruction_loss
 
     def _mse_loss(self, y_true, y_pred):
@@ -336,6 +338,7 @@ class VAE:
             self.conv_strides,
             self.latent_space_dim,
             self.name,
+            self.kl_weight,
             self.data_train,
             self.data_val
         ]

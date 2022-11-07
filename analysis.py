@@ -76,7 +76,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='Training parameters')
 
-    parser.add_argument('--model', help='folder containing parameters and weights of the model', default="models\\batch-size_16#epochs_250#grayscale_True#recon-loss_mse#recon-weight_10#test")
+    parser.add_argument('--model', help='folder containing parameters and weights of the model', default="models\\batch-size_16#epochs_50#grayscale_True#recon-loss_mse#heading-weight_0#test")
     # parser.add_argument('--out', help='name for output files')
     parser.add_argument('--grayscale', help='Boolean whether dataset should be loades as grayscale', default="True")
     # parser.add_argument('--latent_dim', help='Boolean whether dataset should be loades as grayscale', default=None)
