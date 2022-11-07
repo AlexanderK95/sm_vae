@@ -67,6 +67,7 @@ def load_selfmotion_vids(path, video_dim, batch_size=32, train_split=0.8, bw=Tru
 
 class SelfmotionDataGenerator(tf.keras.utils.Sequence):
     def __init__(self, path, batch_size, input_shape=[8, 512, 512], rescale=False, grayscale=True, shuffle=True):
+        self.path = path
         self.base_path = os.path.dirname(path)
         self.data = pd.read_csv(f"{path}", sep=",")
         self.batch_size = batch_size
@@ -133,7 +134,7 @@ class SelfmotionDataGenerator(tf.keras.utils.Sequence):
 #     val_gen = SelfmotionDataGenerator("N:\\Datasets\\selfmotion\\20220930-134704_1.csv", batch_size, video_dim, grayscale=True, shuffle=True)
 #     test = train_gen.__getitem__(0)
 
-#     # n = 100
+#     n = 100
 
 #     # start = time.time()
 #     # start_p = time.process_time()

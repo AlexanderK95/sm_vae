@@ -36,12 +36,12 @@ if __name__ == "__main__":
     rl = args.recon_loss
     rlw = float(args.recon_weight)
 
-    video_dim = [8, 512, 512]
+    video_dim = [8, img_height, img_width]
 
     suffix = args.suffix if not args.suffix==None else ""
 
-    train_data = SelfmotionDataGenerator("/mnt/masc_home/kressal/datasets/selfmotion/20220930-134704_1_ws.csv", batch_size, video_dim, grayscale=True, shuffle=True)
-    val_data = SelfmotionDataGenerator("/mnt/masc_home/kressal/datasets/selfmotion/20220930-134704_1_ws.csv", batch_size, video_dim, grayscale=True, shuffle=True)
+    train_data = SelfmotionDataGenerator("/mnt/masc_home/kressal/datasets/selfmotion/20220930-134704_1.csv", batch_size, video_dim, grayscale=True, shuffle=True)
+    val_data = SelfmotionDataGenerator("/mnt/masc_home/kressal/datasets/selfmotion/20220930-134704_1.csv", batch_size, video_dim, grayscale=True, shuffle=True)
 
     # path = "/home/kressal/datasets/selfmotion_vids"
     # files = [os.path.join(path,fn) for fn in os.listdir(path)]
@@ -89,7 +89,7 @@ if __name__ == "__main__":
     # vae.train(x_train, [x_train, y_train], batch_size, num_epochs=epochs, grayscale=bw, checkpoint_interval=100)
     # vae.train2(train_data, num_epochs=epochs, checkpoint_interval=int(epochs/10))
 
-    vae.train(train_data, val_data, batch_size, num_epochs=epochs, grayscale=bw, checkpoint_interval=100)
-
+    vae.train(train_data, val_data, batch_size, num_epochs=epochs, grayscale=bw, checkpoint_interval=1500)
 
     vae.save(f"models/batch-size_{batch_size}#epochs_{epochs}#grayscale_{bw}#recon-loss_{rl}#recon-weight_{rlw}#{suffix}")
+    print("saved as " + f"models/batch-size_{batch_size}#epochs_{epochs}#grayscale_{bw}#recon-loss_{rl}#recon-weight_{rlw}#{suffix}")

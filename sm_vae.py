@@ -36,7 +36,7 @@ from customLayers import SampleLayer
 
 
 class VAE:
-    def __init__(self,input_shape, conv_filters, conv_kernels, conv_strides, latent_space_dim, name="not_set"):
+    def __init__(self,input_shape, conv_filters, conv_kernels, conv_strides, latent_space_dim, name="not_set", data_train=None, data_val=None):
         print("initializing vae...")
         self.input_shape = input_shape # [28, 28, 1]
         self.conv_filters = conv_filters # [2, 4, 8]
@@ -45,6 +45,9 @@ class VAE:
         self.latent_space_dim = latent_space_dim # 2
         self.name = name
         self.reconstruction_loss_weight = 10000
+
+        self.data_train = data_train
+        self.data_val = data_val
 
         self.dataset = None
         self.encoder = None
@@ -138,7 +141,8 @@ class VAE:
     def train(self, train_gen, validation_gen, batch_size, num_epochs, grayscale, checkpoint_interval=1500, verbosity=1):
         bw = "gray" if grayscale else "color"
         
-        
+        self.data_train = train_gen.path
+        self.data_val = validation_gen.path
         # tf.compat.v1.placeholder(
         #     float, shape=[None, None], name='Heading_Decoder_target'
         # )
@@ -331,7 +335,9 @@ class VAE:
             self.conv_kernels,
             self.conv_strides,
             self.latent_space_dim,
-            self.name
+            self.name,
+            self.data_train,
+            self.data_val
         ]
         save_path = os.path.join(save_folder, f"{prefix}parameters.pkl")
         with open(save_path, "wb") as f:

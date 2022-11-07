@@ -4,9 +4,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import tensorflow as tf
 import skvideo.io
-from dataloader import SelfmotionDataGenerator
 from sm_vae import VAE
-from sm_vae_c2 import VAE as VAE_c2
+from dataloader import SelfmotionDataGenerator
+# from sm_vae_c2 import VAE as VAE_c2
 import os
 from sklearn.manifold import TSNE
 import argparse
@@ -62,7 +62,7 @@ def plot_images_encoded_in_latent_space(latent_representations, sample_labels):
 
 def select_videos(gen, num_vid=10):
     gen.on_epoch_end()
-    videos = gen.__getitem__(0)[0]
+    videos = gen[0][0]
     sample_vids_index = np.random.choice(range(len(videos)), num_vid)
     sample_videos = videos[sample_vids_index]
     return sample_videos
@@ -95,10 +95,10 @@ if __name__ == "__main__":
     # autoencoder_c2 = VAE_c2.load("vae_sm_vid_c2")
     # autoencoder.summary()
     # autoencoder_c2.summary()
-
-    video_dim = [8, 512, 512]
+    img_height, img_width = 256, 256
+    video_dim = [8, img_height, img_width]
     batch_size = 16
-    x_test = SelfmotionDataGenerator("N:\\Datasets\\selfmotion\\20220930-134704_1.csv", batch_size, video_dim, grayscale=bw, shuffle=True)
+    x_test = SelfmotionDataGenerator("/mnt/masc_home/kressal/datasets/selfmotion/20220930-134704_1.csv", batch_size, video_dim, grayscale=bw, shuffle=True)
 
     print("###################################################")
     print(args.model)
