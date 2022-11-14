@@ -60,7 +60,7 @@ def plot_images_encoded_in_latent_space(latent_representations, sample_labels):
     plt.show()
 
 def select_videos(gen, num_vid=10):
-    gen.on_epoch_end()
+    # gen.on_epoch_end()
     videos = gen[0][0]
     sample_vids_index = np.random.choice(range(len(videos)), num_vid)
     sample_videos = videos[sample_vids_index]
@@ -79,6 +79,7 @@ if __name__ == "__main__":
     parser.add_argument('--model', help='folder containing parameters and weights of the model', default="models\\batch-size_16#epochs_50#grayscale_True#recon-loss_mse#heading-weight_0#test")
     # parser.add_argument('--out', help='name for output files')
     parser.add_argument('--grayscale', help='Boolean whether dataset should be loades as grayscale', default="True")
+    # parser.add_argument('--res', help='Video resolution (res x res)', default=256)
     # parser.add_argument('--latent_dim', help='Boolean whether dataset should be loades as grayscale', default=None)
 
     args = parser.parse_args()
@@ -95,11 +96,17 @@ if __name__ == "__main__":
     # autoencoder_c2 = VAE_c2.load("vae_sm_vid_c2")
     # autoencoder.summary()
     # autoencoder_c2.summary()
-    img_height, img_width = 256, 256
-    video_dim = [8, img_height, img_width]
-    batch_size = 16
-    x_test = SelfmotionDataGenerator("/mnt/masc_home/kressal/datasets/selfmotion/20220930-134704_1.csv", batch_size, video_dim, grayscale=bw, shuffle=True)
+    # img_height, img_width = 256, 256
+    video_dim = autoencoder.input_shape
+    print(video_dim)
+    dataset = "20220930-134704_1.csv"
+    # dataset = "20220930-134704_1.csv"   # trainigset
+    batch_size = 64
+    x_test = SelfmotionDataGenerator(f"/mnt/masc_home/kressal/datasets/selfmotion/{dataset}", batch_size, video_dim, grayscale=bw, shuffle=True)
     # x_test = SelfmotionDataGenerator("N:\\Datasets\\selfmotion\\20220930-134704_1.csv", batch_size, video_dim, grayscale=bw, shuffle=True)
+
+    
+    output_name = f"{output_name}#{dataset}"
 
     print("###################################################")
     print(args.model)
@@ -110,6 +117,10 @@ if __name__ == "__main__":
     num_sample_videos_to_show = batch_size
     sample_videos = select_videos(x_test, num_sample_videos_to_show)
     reconstructed_videos, latent_points, headings = autoencoder.reconstruct(sample_videos)
+
+    latent_variations = latent_points + 0.5
+    variations = autoencoder.decoder.predict(latent_variations)
+
     # reconstructed_videos_c2, latent_points_c2 = autoencoder_c2.reconstruct(sample_videos)
 
     print(reconstructed_videos.shape)
@@ -124,6 +135,7 @@ if __name__ == "__main__":
     
     save_video(f"results/{output_name}_recon.mp4", reconstructed_videos[0]*255)
     save_video(f"results/{output_name}_original.mp4", sample_videos[0]*255)
+    save_video(f"results/{output_name}_variation.mp4", variations[0]*255)
     # save_video('test_c2.mp4', reconstructed_videos_c2[0]*255)
 
 
@@ -162,7 +174,7 @@ if __name__ == "__main__":
 
     print("Prediction")
     num_samples = 10
-    latent_points = np.array([[random.uniform(-4, 4) for j in range(int(latent_dim))] for i in range(num_samples)])
+    latent_points = np.array([[random.uniform(-2, 2) for j in range(int(latent_dim))] for i in range(num_samples)])
     # latent_points = np.array([random.uniform(-4, 4) for j in range(200)])
     print(latent_points.shape)
     new_videos = autoencoder.decoder.predict(latent_points)

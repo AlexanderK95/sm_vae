@@ -104,10 +104,10 @@ class VAE:
         self._reconstruction_loss = reconstruction_loss
         self.heading_weight = heading_weight
         # optimizer = Adam(learning_rate=learning_rate)
-        if reconstruction_loss == "mse": rl = self._mse_loss
-        elif reconstruction_loss == "psnr": rl = self._psnr_loss
-        elif reconstruction_loss == "ssmi": rl = self._ssmi_loss
-        else: raise Exception("Invalid loss function, currently supported are: mse, psnr and ssmi")
+        # if reconstruction_loss == "mse": rl = self._mse_loss
+        # elif reconstruction_loss == "psnr": rl = self._psnr_loss
+        # elif reconstruction_loss == "ssmi": rl = self._ssmi_loss
+        # else: raise Exception("Invalid loss function, currently supported are: mse, psnr and ssmi")
 
         losses = {
             "Decoder": 'mse',
@@ -120,7 +120,7 @@ class VAE:
             "Heading_Decoder":self.heading_weight
         }
         metrics = {
-            "Decoder": 'accuracy',
+            "Decoder": 'mean_absolute_percentage_error',
             # "emembedding_stats": tf.keras.losses.KLDivergence(),
             "Heading_Decoder": 'accuracy'
         }
@@ -176,7 +176,7 @@ class VAE:
                 self.tensorboard_callback,
                 # early_stopping_callback,
                 model_checkpoint_callback,
-                tf.keras.callbacks.LearningRateScheduler(lambda epoch: 0.0001 * math.exp(-0.001*epoch))
+                # tf.keras.callbacks.LearningRateScheduler(lambda epoch: 0.0001 * math.exp(-0.001*epoch))
             ]
         )
 

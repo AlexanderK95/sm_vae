@@ -1,7 +1,9 @@
---batch-size 256
---epochs 1000
---dataset-size 100
+--batch-size 64
+--epochs 400
 --grayscale True
---recon-loss mse
---recon-weight 100
---suffix af_lrelu
+--recon-loss binary_crossentropy
+--heading-weight 0.2
+--kl-weight 4.5e-4
+--latent-dim 180
+--learning-rate 0.0001
+--res 256
