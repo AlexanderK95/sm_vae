@@ -22,9 +22,9 @@ def ssmi(Y_true, Y_pred):
 
 
 class FDGDOptimizer:
-    def __init__(self, sample_size:int=50, gegnerator_model=None, learning_rate=0.1, search_radius=0.1, ground_truth=None):
+    def __init__(self, sample_size:int=50, generator=None, learning_rate=0.1, search_radius=0.1, ground_truth=None):
         self.n = sample_size
-        self.generator = VAE.load(gegnerator_model)
+        self.generator = generator
         self.sigma = search_radius
         self.learning_rate = learning_rate
 
@@ -43,7 +43,7 @@ class FDGDOptimizer:
             pertubation = np.array([[random.uniform(-2, 2) for j in np.arange(ldim)]])
             pertubations[i] = self.c0 + pertubation
             antithetic_pertubation = self.c0 - pertubation
-            self.delta_y[i] = self._rate_vector(np.expand_dims(pertubations[i], 0)) - self._rate_vector(antithetic_pertubation)
+            self.delta_y[i] = -(self._rate_vector(np.expand_dims(pertubations[i], 0)) - self._rate_vector(antithetic_pertubation))
             delta_c0 += self.delta_y[i] * pertubations[i] / np.linalg.norm(pertubations[i], 2)
         
         self.c0 = self.c0 * (1 + self.learning_rate * delta_c0)
@@ -51,7 +51,7 @@ class FDGDOptimizer:
     def _rate_vector(self, c):
         decoded = self.generator.decoder.predict(c)
         # return mse(self.y_true, decoded[0])
-        return ssmi(self.y_true.squeeze(), decoded[0].squeeze())
+        return 1/ssmi(self.y_true.squeeze(), decoded[0].squeeze())
 
     
 
@@ -68,7 +68,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    model = "models/batch-size_16#epochs_2000#grayscale_True#recon-loss_binary_crossentropy#heading-weight_0.2#kl-weight_0.00045#latent-dim_360"
+    model = args.model
 
     iterations = int(args.iterations)
     sample_points = int(args.sample_points)
@@ -76,13 +76,17 @@ if __name__ == "__main__":
     search_radius = float(args.search_radius)
     save_intervall = int(args.save_intervall)
 
-    batch_size = 2
-    video_dim = [8, 256, 256]
+    generator = VAE.load(model)
 
-    data = SelfmotionDataGenerator("N:/Datasets/selfmotion/20220930-134704_1.csv", batch_size, video_dim, grayscale=True, shuffle=True)
+    batch_size = 2
+    video_dim = generator.input_shape
+
+    dataset = "20220930-134704_1.csv"
+
+    data = SelfmotionDataGenerator(f"/mnt/masc_home/kressal/datasets/selfmotion/{dataset}", batch_size, video_dim, grayscale=True, shuffle=True)
     y_true = data[0][0][0]
 
-    optimizer = FDGDOptimizer(sample_points, model, ground_truth=y_true)
+    optimizer = FDGDOptimizer(sample_points, generator, learning_rate, search_radius, ground_truth=y_true)
 
     rating = np.zeros(iterations)
 
@@ -101,12 +105,12 @@ if __name__ == "__main__":
     figsize = 12
     plt.figure(figsize=(figsize, figsize))
     plt.plot(rating)
-    plt.xlabel("Rating", size=20)
-    plt.ylabel("Iteration", size=20)
+    plt.ylabel("Rating", size=20)
+    plt.xlabel("Iteration", size=20)
     plt.xticks(size=20)
     plt.yticks(size=20)
     plt.title(f"{output_name}", size=10)
-    plt.savefig(f"results/{output_name}_rating.png")
+    plt.savefig(f"optimizer_results/{output_name}_rating.png")
 
     # output_name = f"it_{iterations}#_sp_{sample_points}"
     save_video(f"optimizer_results/it_{i}#sp_{sample_points}#lr_{learning_rate}#sr_{search_radius}_original.mp4", y_true*255)
