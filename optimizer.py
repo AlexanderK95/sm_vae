@@ -63,7 +63,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Optimizer parameters')
 
     parser.add_argument('--model', help='folder containing parameters and weights of the model', default="models\\batch-size_16#epochs_50#grayscale_True#recon-loss_mse#heading-weight_0#test")
-    parser.add_argument('--iterations', help='number of iterations the optimizer should run for', default="200")
+    parser.add_argument('--iterations', help='number of iterations the optimizer should run for', default="10")
     parser.add_argument('--sample-points', help='how many sample points are used for gradients', default="50")
     parser.add_argument('--learning-rate', help='weight for the update of the point in latent space', default="1")
     parser.add_argument('--search-radius', help='tbd', default="0.5")
@@ -85,23 +85,31 @@ if __name__ == "__main__":
 
     generator = VAE.load(model)
 
-    batch_size = 2
+    batch_size = 1
     video_dim = generator.input_shape
 
     dataset = "20220930-134704_1.csv"
 
     data = SelfmotionDataGenerator(f"/mnt/masc_home/kressal/datasets/selfmotion/{dataset}", batch_size, video_dim, grayscale=True, shuffle=True)
+    # data = SelfmotionDataGenerator(f"N:\\Datasets\\selfmotion\\{dataset}", batch_size, video_dim, grayscale=True, shuffle=True)
     y_true = data[0][0][0]
+    reconstructed_images, latent_representations, predicted_heading = generator.reconstruct(np.expand_dims(y_true, 0))
 
     optimizer = FDGDOptimizer(sample_points, generator, learning_rate, search_radius, ground_truth=y_true)
 
     rating = np.zeros(iterations)
+    distance = np.zeros(iterations)
+    heading_error = np.zeros(iterations)
+    embedding_error = np.zeros(iterations)
 
     t = tqdm(np.arange(iterations))
     for i in t:
         optimizer.step()
         current_guess = optimizer.generator.decoder.predict(np.expand_dims(optimizer.c0, 0))
         rating[i] = ssmi(y_true.squeeze(), current_guess.squeeze())
+        distance[i] = np.linalg.norm(optimizer.c0-latent_representations, 2)
+        embedding_error[i] = mse(latent_representations, optimizer.c0)
+        heading_error[i] = mse(data[0][1][1], predicted_heading)
         t.set_description(f"rating: {rating[i]:.4f}, mean delta_y: {optimizer.delta_y.mean():.4f}", refresh=True)
         if i%save_intervall == 0:
             save_video(f"optimizer_results/{prefix}__it_{i}#sp_{sample_points}#lr_{learning_rate}#sr_{search_radius}#rating_{rating[i]:.4f}_guess.mp4", current_guess[0]*255)
@@ -110,22 +118,44 @@ if __name__ == "__main__":
 
     output_name = f"{prefix}__it_{i}#sp_{sample_points}#lr_{learning_rate}#sr_{search_radius}#ld_{generator.latent_space_dim}"
     figsize = 12
+    fontsize = 15
     plt.figure(figsize=(figsize, figsize))
     plt.plot(rating)
-    plt.ylabel("Rating", size=20)
-    plt.xlabel("Iteration", size=20)
-    plt.xticks(size=20)
-    plt.yticks(size=20)
-    plt.title(f"{output_name}", size=10)
+    plt.ylabel("SSMI", size=fontsize)
+    plt.xlabel("Iteration", size=fontsize)
+    plt.xticks(size=fontsize)
+    plt.yticks(size=fontsize)
+    plt.title(f"{output_name}", size=fontsize)
     plt.savefig(f"optimizer_results/{output_name}_rating.png")
+
+    plt.figure(figsize=(figsize, figsize))
+    plt.plot(distance)
+    plt.ylabel("L2 Norm", size=fontsize)
+    plt.xlabel("Iteration", size=fontsize)
+    plt.xticks(size=fontsize)
+    plt.yticks(size=fontsize)
+    plt.title(f"{output_name} - distance", size=fontsize)
+    plt.savefig(f"optimizer_results/{output_name}_distance.png")
+
+    plt.figure(figsize=(figsize, figsize))
+    plt.plot(heading_error)
+    plt.ylabel("MSE", size=fontsize)
+    plt.xlabel("Iteration", size=fontsize)
+    plt.xticks(size=fontsize)
+    plt.yticks(size=fontsize)
+    plt.title(f"{output_name} - MSE(heading)", size=fontsize)
+    plt.savefig(f"optimizer_results/{output_name}_heading_error.png")
+
+    plt.figure(figsize=(figsize, figsize))
+    plt.plot(embedding_error)
+    plt.ylabel("MSE", size=fontsize)
+    plt.xlabel("Iteration", size=fontsize)
+    plt.xticks(size=fontsize)
+    plt.yticks(size=fontsize)
+    plt.title(f"{output_name} - MSE(embedding)", size=fontsize)
+    plt.savefig(f"optimizer_results/{output_name}_embedding_error.png")
 
     # output_name = f"it_{iterations}#_sp_{sample_points}"
     save_video(f"optimizer_results/{prefix}__it_{i}#sp_{sample_points}#lr_{learning_rate}#sr_{search_radius}_original.mp4", y_true*255)
-
-
-    reconstructed_images, latent_representations, predicted_heading = generator.reconstruct(y_true)
-    optimizer.c0
-    latent_distance = np.linalg.norm(optimizer.c0-latent_representations, 2)
-
-    # save_video(f"optimizer_results/{output_name}_guess.mp4", current_guess[0]*255)
+    save_video(f"optimizer_results/{prefix}__it_{i}#sp_{sample_points}#lr_{learning_rate}#sr_{search_radius}_reconstructed.mp4", reconstructed_images[0]*255)
     pass
