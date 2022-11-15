@@ -35,23 +35,26 @@ class FDGDOptimizer:
 
     def step(self):
         ldim = self.generator.latent_space_dim
-        pertubations = np.zeros([self.n, ldim])
+        # pertubations = np.zeros([self.n, ldim])
         # pertubations = np.zeros([[random.uniform(-2, 2) for j in range(int(ldim))] for i in range(num_samples)])
         self.delta_y = np.zeros(self.n)
         delta_c0 = np.zeros(ldim)
         for i in np.arange(self.n):
-            pertubation = np.array([[random.uniform(-2, 2) for j in np.arange(ldim)]])
-            pertubations[i] = self.c0 + pertubation
-            antithetic_pertubation = self.c0 - pertubation
-            self.delta_y[i] = -(self._rate_vector(np.expand_dims(pertubations[i], 0)) - self._rate_vector(antithetic_pertubation))
-            delta_c0 += self.delta_y[i] * pertubations[i] / np.linalg.norm(pertubations[i], 2)
+            pertubation = np.array([[random.uniform(-1, 1) for j in np.arange(ldim)]])
+            c_plus = self.c0 + pertubation
+            c_minus = self.c0 - pertubation
+            self.delta_y[i] = self._rate_vector(c_plus) - self._rate_vector(c_minus)
+            delta_c0 += self.delta_y[i] * pertubation.squeeze() / np.linalg.norm(pertubation.squeeze(), 2)
         
-        self.c0 = self.c0 * (1 + self.learning_rate * delta_c0)
+        self.c0 += self.learning_rate * delta_c0
 
     def _rate_vector(self, c):
         decoded = self.generator.decoder.predict(c)
         # return mse(self.y_true, decoded[0])
-        return 1/ssmi(self.y_true.squeeze(), decoded[0].squeeze())
+        return -mse(self.y_true.squeeze(), decoded[0].squeeze())
+        # return 1/mse(self.y_true.squeeze(), decoded[0].squeeze())
+        # return ssmi(self.y_true.squeeze(), decoded[0].squeeze())
+        # return -1/ssmi(self.y_true.squeeze(), decoded[0].squeeze())
 
     
 
@@ -66,6 +69,8 @@ if __name__ == "__main__":
     parser.add_argument('--search-radius', help='tbd', default="0.5")
     parser.add_argument('--save-intervall', help='after how many interations a video is saved', default="50")
 
+    parser.add_argument('--prefix', help='prefix of files for sorting', default=None)
+
     args = parser.parse_args()
 
     model = args.model
@@ -75,6 +80,8 @@ if __name__ == "__main__":
     learning_rate = float(args.learning_rate)
     search_radius = float(args.search_radius)
     save_intervall = int(args.save_intervall)
+
+    prefix = args.prefix
 
     generator = VAE.load(model)
 
@@ -97,11 +104,11 @@ if __name__ == "__main__":
         rating[i] = ssmi(y_true.squeeze(), current_guess.squeeze())
         t.set_description(f"rating: {rating[i]:.4f}, mean delta_y: {optimizer.delta_y.mean():.4f}", refresh=True)
         if i%save_intervall == 0:
-            save_video(f"optimizer_results/it_{i}#sp_{sample_points}#lr_{learning_rate}#sr_{search_radius}_guess.mp4", current_guess[0]*255)
+            save_video(f"optimizer_results/{prefix}__it_{i}#sp_{sample_points}#lr_{learning_rate}#sr_{search_radius}#rating_{rating[i]:.4f}_guess.mp4", current_guess[0]*255)
 
-    save_video(f"optimizer_results/it_{i}#sp_{sample_points}#lr_{learning_rate}#sr_{search_radius}_guess.mp4", current_guess[0]*255)
+    save_video(f"optimizer_results/{prefix}__it_{i}#sp_{sample_points}#lr_{learning_rate}#sr_{search_radius}#rating_{rating[i]:.4f}_guess.mp4", current_guess[0]*255)
 
-    output_name = f"it_{i}#sp_{sample_points}#lr_{learning_rate}#sr_{search_radius}"
+    output_name = f"{prefix}__it_{i}#sp_{sample_points}#lr_{learning_rate}#sr_{search_radius}#ld_{generator.latent_space_dim}"
     figsize = 12
     plt.figure(figsize=(figsize, figsize))
     plt.plot(rating)
@@ -113,6 +120,12 @@ if __name__ == "__main__":
     plt.savefig(f"optimizer_results/{output_name}_rating.png")
 
     # output_name = f"it_{iterations}#_sp_{sample_points}"
-    save_video(f"optimizer_results/it_{i}#sp_{sample_points}#lr_{learning_rate}#sr_{search_radius}_original.mp4", y_true*255)
+    save_video(f"optimizer_results/{prefix}__it_{i}#sp_{sample_points}#lr_{learning_rate}#sr_{search_radius}_original.mp4", y_true*255)
+
+
+    reconstructed_images, latent_representations, predicted_heading = generator.reconstruct(y_true)
+    optimizer.c0
+    latent_distance = np.linalg.norm(optimizer.c0-latent_representations, 2)
+
     # save_video(f"optimizer_results/{output_name}_guess.mp4", current_guess[0]*255)
     pass
