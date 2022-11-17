@@ -51,10 +51,10 @@ class FDGDOptimizer:
     def _rate_vector(self, c):
         decoded = self.generator.decoder.predict(c)
         # return mse(self.y_true, decoded[0])
-        return -mse(self.y_true.squeeze(), decoded[0].squeeze())
+        # return -mse(self.y_true.squeeze(), decoded[0].squeeze())
         # return 1/mse(self.y_true.squeeze(), decoded[0].squeeze())
         # return ssmi(self.y_true.squeeze(), decoded[0].squeeze())
-        # return -1/ssmi(self.y_true.squeeze(), decoded[0].squeeze())
+        return -1/ssmi(self.y_true.squeeze(), decoded[0].squeeze())
 
     
 
@@ -63,7 +63,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Optimizer parameters')
 
     parser.add_argument('--model', help='folder containing parameters and weights of the model', default="models\\batch-size_16#epochs_50#grayscale_True#recon-loss_mse#heading-weight_0#test")
-    parser.add_argument('--iterations', help='number of iterations the optimizer should run for', default="10")
+    parser.add_argument('--trials', help='number of trials the optimizer should run for', default="10")
     parser.add_argument('--sample-points', help='how many sample points are used for gradients', default="50")
     parser.add_argument('--learning-rate', help='weight for the update of the point in latent space', default="1")
     parser.add_argument('--search-radius', help='tbd', default="0.5")
@@ -75,11 +75,13 @@ if __name__ == "__main__":
 
     model = args.model
 
-    iterations = int(args.iterations)
+    trials = int(args.trials)
     sample_points = int(args.sample_points)
     learning_rate = float(args.learning_rate)
     search_radius = float(args.search_radius)
     save_intervall = int(args.save_intervall)
+
+    iterations = trials//(sample_points * 2)
 
     prefix = args.prefix
 
@@ -88,7 +90,8 @@ if __name__ == "__main__":
     batch_size = 1
     video_dim = generator.input_shape
 
-    dataset = "20220930-134704_1.csv"
+    dataset = "20220930-134704_1.csv" # trainingset
+    # dataset = "20221110-174245_1_ws.csv"
 
     data = SelfmotionDataGenerator(f"/mnt/masc_home/kressal/datasets/selfmotion/{dataset}", batch_size, video_dim, grayscale=True, shuffle=True)
     # data = SelfmotionDataGenerator(f"N:\\Datasets\\selfmotion\\{dataset}", batch_size, video_dim, grayscale=True, shuffle=True)
@@ -102,10 +105,13 @@ if __name__ == "__main__":
     heading_error = np.zeros(iterations)
     embedding_error = np.zeros(iterations)
 
+    x = np.arange(iterations) * sample_points * 2
+
     t = tqdm(np.arange(iterations))
     for i in t:
         optimizer.step()
         current_guess = optimizer.generator.decoder.predict(np.expand_dims(optimizer.c0, 0))
+        predicted_heading = optimizer.generator.heading_decoder.predict(np.expand_dims(optimizer.c0, 0))
         rating[i] = ssmi(y_true.squeeze(), current_guess.squeeze())
         distance[i] = np.linalg.norm(optimizer.c0-latent_representations, 2)
         embedding_error[i] = mse(latent_representations, optimizer.c0)
@@ -120,42 +126,49 @@ if __name__ == "__main__":
     figsize = 12
     fontsize = 15
     plt.figure(figsize=(figsize, figsize))
-    plt.plot(rating)
+    plt.plot(x, rating)
     plt.ylabel("SSMI", size=fontsize)
-    plt.xlabel("Iteration", size=fontsize)
+    plt.xlabel("Trial", size=fontsize)
     plt.xticks(size=fontsize)
     plt.yticks(size=fontsize)
     plt.title(f"{output_name}", size=fontsize)
     plt.savefig(f"optimizer_results/{output_name}_rating.png")
 
     plt.figure(figsize=(figsize, figsize))
-    plt.plot(distance)
+    plt.plot(x, distance)
     plt.ylabel("L2 Norm", size=fontsize)
-    plt.xlabel("Iteration", size=fontsize)
+    plt.xlabel("Trial", size=fontsize)
     plt.xticks(size=fontsize)
     plt.yticks(size=fontsize)
     plt.title(f"{output_name} - distance", size=fontsize)
     plt.savefig(f"optimizer_results/{output_name}_distance.png")
 
     plt.figure(figsize=(figsize, figsize))
-    plt.plot(heading_error)
+    plt.plot(x, heading_error)
     plt.ylabel("MSE", size=fontsize)
-    plt.xlabel("Iteration", size=fontsize)
+    plt.xlabel("Trial", size=fontsize)
     plt.xticks(size=fontsize)
     plt.yticks(size=fontsize)
     plt.title(f"{output_name} - MSE(heading)", size=fontsize)
     plt.savefig(f"optimizer_results/{output_name}_heading_error.png")
 
     plt.figure(figsize=(figsize, figsize))
-    plt.plot(embedding_error)
+    plt.plot(x, embedding_error)
     plt.ylabel("MSE", size=fontsize)
-    plt.xlabel("Iteration", size=fontsize)
+    plt.xlabel("Trial", size=fontsize)
     plt.xticks(size=fontsize)
     plt.yticks(size=fontsize)
     plt.title(f"{output_name} - MSE(embedding)", size=fontsize)
     plt.savefig(f"optimizer_results/{output_name}_embedding_error.png")
 
-    # output_name = f"it_{iterations}#_sp_{sample_points}"
+    plt.figure(figsize=(figsize, figsize))
+    plt.boxplot(optimizer.c0)
+    plt.xticks(size=fontsize)
+    plt.yticks(size=fontsize)
+    plt.title(f"{output_name} - embedding", size=fontsize)
+    plt.savefig(f"optimizer_results/{output_name}_embedding_box.png")
+
+    # output_name = f"it_{trials}#_sp_{sample_points}"
     save_video(f"optimizer_results/{prefix}__it_{i}#sp_{sample_points}#lr_{learning_rate}#sr_{search_radius}_original.mp4", y_true*255)
     save_video(f"optimizer_results/{prefix}__it_{i}#sp_{sample_points}#lr_{learning_rate}#sr_{search_radius}_reconstructed.mp4", reconstructed_images[0]*255)
     pass

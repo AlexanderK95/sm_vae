@@ -99,9 +99,9 @@ if __name__ == "__main__":
     # img_height, img_width = 256, 256
     video_dim = autoencoder.input_shape
     print(video_dim)
-    dataset = "20220930-134704_1.csv"
-    # dataset = "20220930-134704_1.csv"   # trainigset
-    batch_size = 64
+    # dataset = "20221110-174245_1_ws.csv"
+    dataset = "20220930-134704_1_ws.csv"   # trainigset
+    batch_size = 476
     x_test = SelfmotionDataGenerator(f"/mnt/masc_home/kressal/datasets/selfmotion/{dataset}", batch_size, video_dim, grayscale=bw, shuffle=True)
     # x_test = SelfmotionDataGenerator("N:\\Datasets\\selfmotion\\20220930-134704_1.csv", batch_size, video_dim, grayscale=bw, shuffle=True)
 
@@ -118,7 +118,24 @@ if __name__ == "__main__":
     sample_videos = select_videos(x_test, num_sample_videos_to_show)
     reconstructed_videos, latent_points, headings = autoencoder.reconstruct(sample_videos)
 
-    latent_variations = latent_points + 0.5
+    vx_corr = np.zeros(latent_points.shape[1])
+    vy_corr = np.zeros(latent_points.shape[1])
+    vz_corr = np.zeros(latent_points.shape[1])
+    yaw_corr = np.zeros(latent_points.shape[1])
+    pitch_corr = np.zeros(latent_points.shape[1])
+    roll_corr = np.zeros(latent_points.shape[1])
+
+    for i in np.arange(latent_points.shape[1]):
+        vx_corr[i] = np.corrcoef(latent_points[:,i], headings[:,0])
+        vy_corr[i] = np.corrcoef(latent_points[:,i], headings[:,1])
+        vz_corr[i] = np.corrcoef(latent_points[:,i], headings[:,2])
+        yaw_corr[i] = np.corrcoef(latent_points[:,i], headings[:,3])
+        pitch_corr[i] = np.corrcoef(latent_points[:,i], headings[:,4])
+        roll_corr[i] = np.corrcoef(latent_points[:,i], headings[:,5])
+
+    
+
+    latent_variations = latent_points + 1
     variations = autoencoder.decoder.predict(latent_variations)
 
     # reconstructed_videos_c2, latent_points_c2 = autoencoder_c2.reconstruct(sample_videos)
