@@ -2,6 +2,7 @@ import random
 import sys
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib
 import tensorflow as tf
 import skvideo.io
 from sm_vae import VAE
@@ -11,7 +12,8 @@ import os
 from sklearn.manifold import TSNE
 import argparse
 
-
+matplotlib.rc('xtick', labelsize=20) 
+matplotlib.rc('ytick', labelsize=20) 
 # os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
 
@@ -103,6 +105,7 @@ if __name__ == "__main__":
     dataset = "20220930-134704_1_ws.csv"   # trainigset
     batch_size = 476
     x_test = SelfmotionDataGenerator(f"/mnt/masc_home/kressal/datasets/selfmotion/{dataset}", batch_size, video_dim, grayscale=bw, shuffle=True)
+    # batch_size = 32
     # x_test = SelfmotionDataGenerator("N:\\Datasets\\selfmotion\\20220930-134704_1.csv", batch_size, video_dim, grayscale=bw, shuffle=True)
 
     
@@ -126,14 +129,22 @@ if __name__ == "__main__":
     roll_corr = np.zeros(latent_points.shape[1])
 
     for i in np.arange(latent_points.shape[1]):
-        vx_corr[i] = np.corrcoef(latent_points[:,i], headings[:,0])
-        vy_corr[i] = np.corrcoef(latent_points[:,i], headings[:,1])
-        vz_corr[i] = np.corrcoef(latent_points[:,i], headings[:,2])
-        yaw_corr[i] = np.corrcoef(latent_points[:,i], headings[:,3])
-        pitch_corr[i] = np.corrcoef(latent_points[:,i], headings[:,4])
-        roll_corr[i] = np.corrcoef(latent_points[:,i], headings[:,5])
+        vx_corr[i] = np.corrcoef(latent_points[:,i], headings[:,0])[0,1]
+        vy_corr[i] = np.corrcoef(latent_points[:,i], headings[:,1])[0,1]
+        vz_corr[i] = np.corrcoef(latent_points[:,i], headings[:,2])[0,1]
+        yaw_corr[i] = np.corrcoef(latent_points[:,i], headings[:,3])[0,1]
+        pitch_corr[i] = np.corrcoef(latent_points[:,i], headings[:,4])[0,1]
+        roll_corr[i] = np.corrcoef(latent_points[:,i], headings[:,5])[0,1]
 
-    
+    x = np.arange(latent_points.shape[1])
+    fig, axs = plt.subplots(2, 3, figsize=(50, 20))
+    axs[0, 0].bar(x, vx_corr)
+    axs[0, 1].bar(x, vy_corr)
+    axs[0, 2].bar(x, vz_corr)
+    axs[1, 0].bar(x, yaw_corr)
+    axs[1, 1].bar(x, pitch_corr)
+    axs[1, 2].bar(x, roll_corr)
+    plt.savefig(f"results/{output_name}_latent-heading_corr.png")
 
     latent_variations = latent_points + 1
     variations = autoencoder.decoder.predict(latent_variations)
