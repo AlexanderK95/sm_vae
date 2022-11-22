@@ -103,7 +103,7 @@ if __name__ == "__main__":
     print(video_dim)
     # dataset = "20221110-174245_1_ws.csv"
     dataset = "20220930-134704_1_ws.csv"   # trainigset
-    batch_size = 476
+    batch_size = 460
     x_test = SelfmotionDataGenerator(f"/mnt/masc_home/kressal/datasets/selfmotion/{dataset}", batch_size, video_dim, grayscale=bw, shuffle=True)
     # batch_size = 32
     # x_test = SelfmotionDataGenerator("N:\\Datasets\\selfmotion\\20220930-134704_1.csv", batch_size, video_dim, grayscale=bw, shuffle=True)
