@@ -56,7 +56,57 @@ class FDGDOptimizer:
         # return ssmi(self.y_true.squeeze(), decoded[0].squeeze())
         return -1/ssmi(self.y_true.squeeze(), decoded[0].squeeze())
 
-    
+
+class GeneticOptimizer:
+    def __init__(self, population_size:int=50, generator=None, selectivity=0.5, heritability=0.5, mutation_rate=0.05, mutation_size=0.1, ground_truth=None):
+        self.n = population_size
+        self.s = selectivity
+        self.h = heritability
+        self.r = mutation_rate
+        self.sigma = mutation_size
+
+        self.generator = generator
+
+        self.population = np.array([[random.uniform(-2, 2) for j in range(int(self.generator.latent_space_dim))] for i in range(self.n)])
+
+        self.y_true = ground_truth    
+
+        self.indices = np.arange(self.generator.latent_space_dim)
+
+    def step(self):
+        decoded = self.generator.decoder.predict(self.population)
+        vf = np.zeros(self.n)
+        for i in np.arange(decoded.shape[0]):
+            vf[i] = -1/ssmi(self.y_true.squeeze(), decoded[i].squeeze())
+        p = self._get_probabilities(vf)
+        for i in np.arange(self.n):
+            parents_idx = np.random.choice(np.arange(self.n), 2, True, p)
+            idx_p1 = np.random.choice(self.indices, int(self.n * self.h), False)
+            mask = np.array([(i in idx_p1) for i in self.indices])
+            idx_p2 = self.indices[~mask]
+            new_latent = np.zeros_like(self.indices)
+            new_latent[idx_p1] = self.population[parents_idx[0]][idx_p1]
+            new_latent[idx_p2] = self.population[parents_idx[1]][idx_p2]
+            self.population[i] = new_latent
+        #Todo add Mutation
+        pass
+
+    def _get_probabilities(self, fitness_vector):
+        f_min = fitness_vector.min()
+        f_std = fitness_vector.std()
+        k = f_std/self.s
+        w = np.exp((fitness_vector-f_min)/k)
+        return w/np.sum(w)
+
+
+    def _rate_vector(self, c):
+        decoded = self.generator.decoder.predict(c)
+        # return mse(self.y_true, decoded[0])
+        # return -mse(self.y_true.squeeze(), decoded[0].squeeze())
+        # return 1/mse(self.y_true.squeeze(), decoded[0].squeeze())
+        # return ssmi(self.y_true.squeeze(), decoded[0].squeeze())
+        return -1/ssmi(self.y_true.squeeze(), decoded[0].squeeze())
+
 
 if __name__ == "__main__":
 
@@ -93,12 +143,21 @@ if __name__ == "__main__":
     dataset = "20220930-134704_1.csv" # trainingset
     # dataset = "20221110-174245_1_ws.csv"
 
-    data = SelfmotionDataGenerator(f"/mnt/masc_home/kressal/datasets/selfmotion/{dataset}", batch_size, video_dim, grayscale=True, shuffle=True)
-    # data = SelfmotionDataGenerator(f"N:\\Datasets\\selfmotion\\{dataset}", batch_size, video_dim, grayscale=True, shuffle=True)
+    # data = SelfmotionDataGenerator(f"/mnt/masc_home/kressal/datasets/selfmotion/{dataset}", batch_size, video_dim, grayscale=True, shuffle=True)
+    data = SelfmotionDataGenerator(f"N:\\Datasets\\selfmotion\\{dataset}", batch_size, video_dim, grayscale=True, shuffle=True)
     y_true = data[0][0][0]
     reconstructed_images, latent_representations, predicted_heading = generator.reconstruct(np.expand_dims(y_true, 0))
 
+
+    optimizer = GeneticOptimizer(sample_points, generator, ground_truth=y_true)
+    optimizer.step()
+    optimizer.step()
+    optimizer.step()
+    optimizer.step()
+    optimizer.step()
+
     optimizer = FDGDOptimizer(sample_points, generator, learning_rate, search_radius, ground_truth=y_true)
+    
 
     rating = np.zeros(iterations)
     distance = np.zeros(iterations)
