@@ -82,7 +82,7 @@ class GeneticOptimizer:
         mutation_candidates = random.sample(list(range(self.n)), int(self.n*self.r))
         vf = np.zeros(self.n)
         for i in np.arange(decoded.shape[0]):
-            vf[i] = -1/ssmi(self.y_true.squeeze(), decoded[i].squeeze())
+            vf[i] = ssmi(self.y_true.squeeze(), decoded[i].squeeze())
         p = self._get_probabilities(vf)
         self.c0 = self.population[np.argmax(p)]
         for i in np.arange(self.n):
@@ -104,15 +104,6 @@ class GeneticOptimizer:
         k = f_std/self.s
         w = np.exp((fitness_vector-f_min)/k)
         return w/np.sum(w)
-
-
-    def _rate_vector(self, c):
-        decoded = self.generator.decoder.predict(c)
-        # return mse(self.y_true, decoded[0])
-        # return -mse(self.y_true.squeeze(), decoded[0].squeeze())
-        # return 1/mse(self.y_true.squeeze(), decoded[0].squeeze())
-        # return ssmi(self.y_true.squeeze(), decoded[0].squeeze())
-        return -1/ssmi(self.y_true.squeeze(), decoded[0].squeeze())
 
 class NSEOptimizer:
     def __init__(self, sample_size:int=50, generator=None, learning_rate=0.1, search_radius=0.1, ground_truth=None):
@@ -196,14 +187,14 @@ if __name__ == "__main__":
     reconstructed_images, latent_representations, predicted_heading = generator.reconstruct(np.expand_dims(y_true, 0))
 
 
-    # optimizer = GeneticOptimizer(100, generator, ground_truth=y_true, selectivity=0.8, mutation_rate=0.1, mutation_size=0.01)
+    optimizer = GeneticOptimizer(50, generator, ground_truth=y_true, selectivity=0.8, mutation_rate=0.2, mutation_size=0.1, heritability=0.8)
     # optimizer.step()
     # optimizer.step()
     # optimizer.step()
     # optimizer.step()
     # optimizer.step()
 
-    optimizer = FDGDOptimizer(sample_points, generator, learning_rate, search_radius, ground_truth=y_true)
+    # optimizer = FDGDOptimizer(sample_points, generator, learning_rate, search_radius, ground_truth=y_true)
     # optimizer = FDGDOptimizer(sample_points, generator, learning_rate, search_radius, ground_truth=predicted_heading)
     
 
@@ -225,8 +216,8 @@ if __name__ == "__main__":
         distance[i] = np.linalg.norm(optimizer.c0-latent_representations, 2)
         embedding_error[i] = mse(latent_representations, optimizer.c0)
         heading_error[i] = mse(data[0][1][1], predicted_heading)
-        t.set_description(f"rating: {rating[i]:.4f}, mean delta_y: {optimizer.delta_y.mean():.4f}", refresh=True)
-        # t.set_description(f"rating: {rating[i]:.4f}", refresh=True)
+        # t.set_description(f"rating: {rating[i]:.4f}, mean delta_y: {optimizer.delta_y.mean():.4f}", refresh=True)
+        t.set_description(f"rating: {rating[i]:.4f}", refresh=True)
         if i%save_intervall == 0:
             save_video(f"optimizer_results/{prefix}__it_{i}#sp_{sample_points}#lr_{learning_rate}#sr_{search_radius}#rating_{rating[i]:.4f}_guess.mp4", current_guess[0]*255)
 
