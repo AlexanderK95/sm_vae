@@ -50,11 +50,13 @@ class FDGDOptimizer:
 
     def _rate_vector(self, c):
         decoded = self.generator.decoder.predict(c)
+        # heading = self.generator.heading_decoder(c)
         # return mse(self.y_true, decoded[0])
         # return -mse(self.y_true.squeeze(), decoded[0].squeeze())
         # return 1/mse(self.y_true.squeeze(), decoded[0].squeeze())
         # return ssmi(self.y_true.squeeze(), decoded[0].squeeze())
         return -1/ssmi(self.y_true.squeeze(), decoded[0].squeeze())
+        # return -mse(self.y_true.squeeze(), heading.numpy().squeeze())
 
 
 class GeneticOptimizer:
@@ -73,12 +75,16 @@ class GeneticOptimizer:
 
         self.indices = np.arange(self.generator.latent_space_dim)
 
+        self.c0 = np.zeros(self.generator.latent_space_dim)
+
     def step(self):
         decoded = self.generator.decoder.predict(self.population)
+        mutation_candidates = random.sample(list(range(self.n)), int(self.n*self.r))
         vf = np.zeros(self.n)
         for i in np.arange(decoded.shape[0]):
             vf[i] = -1/ssmi(self.y_true.squeeze(), decoded[i].squeeze())
         p = self._get_probabilities(vf)
+        self.c0 = self.population[np.argmax(p)]
         for i in np.arange(self.n):
             parents_idx = np.random.choice(np.arange(self.n), 2, True, p)
             idx_p1 = np.random.choice(self.indices, int(self.n * self.h), False)
@@ -88,8 +94,9 @@ class GeneticOptimizer:
             new_latent[idx_p1] = self.population[parents_idx[0]][idx_p1]
             new_latent[idx_p2] = self.population[parents_idx[1]][idx_p2]
             self.population[i] = new_latent
-        #Todo add Mutation
-        pass
+            if i in mutation_candidates:
+                mutation = np.random.multivariate_normal(np.zeros_like(self.indices), np.eye(self.indices.size)*self.sigma, 1).squeeze()
+                self.population[i] += mutation
 
     def _get_probabilities(self, fitness_vector):
         f_min = fitness_vector.min()
@@ -107,19 +114,57 @@ class GeneticOptimizer:
         # return ssmi(self.y_true.squeeze(), decoded[0].squeeze())
         return -1/ssmi(self.y_true.squeeze(), decoded[0].squeeze())
 
+class NSEOptimizer:
+    def __init__(self, sample_size:int=50, generator=None, learning_rate=0.1, search_radius=0.1, ground_truth=None):
+        self.n = sample_size
+        self.generator = generator
+        self.sigma = search_radius
+        self.learning_rate = learning_rate
+
+        self.c0 = np.array([random.uniform(-2, 2) for j in range(int(self.generator.latent_space_dim))])
+
+        self.y_true = ground_truth
+
+
+    def step(self):
+        ldim = self.generator.latent_space_dim
+        # pertubations = np.zeros([self.n, ldim])
+        # pertubations = np.zeros([[random.uniform(-2, 2) for j in range(int(ldim))] for i in range(num_samples)])
+        self.delta_y = np.zeros(self.n)
+        delta_c0 = np.zeros(ldim)
+        for i in np.arange(self.n):
+            pertubation = np.array([[random.uniform(-1, 1) for j in np.arange(ldim)]])
+            c_plus = self.c0 + pertubation
+            c_minus = self.c0 - pertubation
+            self.delta_y[i] = self._rate_vector(c_plus) - self._rate_vector(c_minus)
+            delta_c0 += self.delta_y[i] * pertubation.squeeze() / np.linalg.norm(pertubation.squeeze(), 2)
+        
+        self.c0 += self.learning_rate * delta_c0
+
+
+    def _rate_vector(self, c):
+        decoded = self.generator.decoder.predict(c)
+        # heading = self.generator.heading_decoder(c)
+        # return mse(self.y_true, decoded[0])
+        # return -mse(self.y_true.squeeze(), decoded[0].squeeze())
+        # return 1/mse(self.y_true.squeeze(), decoded[0].squeeze())
+        # return ssmi(self.y_true.squeeze(), decoded[0].squeeze())
+        return -1/ssmi(self.y_true.squeeze(), decoded[0].squeeze())
+        # return -mse(self.y_true.squeeze(), heading.numpy().squeeze())
+
 
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='Optimizer parameters')
 
-    parser.add_argument('--model', help='folder containing parameters and weights of the model', default="models\\batch-size_16#epochs_50#grayscale_True#recon-loss_mse#heading-weight_0#test")
-    parser.add_argument('--trials', help='number of trials the optimizer should run for', default="10")
-    parser.add_argument('--sample-points', help='how many sample points are used for gradients', default="50")
+    parser.add_argument('--model', help='folder containing parameters and weights of the model', default="models\\batch-size_32#epochs_2000#grayscale_True#recon-loss_binary_crossentropy#heading-weight_0.2#kl-weight_0.00045#latent-dim_210#learning-rate_0.0002")
+    parser.add_argument('--trials', help='number of trials the optimizer should run for', default="6000")
+    parser.add_argument('--sample-points', help='how many sample points are used for gradients', default="25")
     parser.add_argument('--learning-rate', help='weight for the update of the point in latent space', default="1")
     parser.add_argument('--search-radius', help='tbd', default="0.5")
     parser.add_argument('--save-intervall', help='after how many interations a video is saved', default="50")
 
-    parser.add_argument('--prefix', help='prefix of files for sorting', default=None)
+    parser.add_argument('--prefix', help='prefix of files for sorting', default="")
 
     args = parser.parse_args()
 
@@ -134,6 +179,7 @@ if __name__ == "__main__":
     iterations = trials//(sample_points * 2)
 
     prefix = args.prefix
+    prefix = "fdgd"
 
     generator = VAE.load(model)
 
@@ -144,19 +190,21 @@ if __name__ == "__main__":
     # dataset = "20221110-174245_1_ws.csv"
 
     # data = SelfmotionDataGenerator(f"/mnt/masc_home/kressal/datasets/selfmotion/{dataset}", batch_size, video_dim, grayscale=True, shuffle=True)
-    data = SelfmotionDataGenerator(f"N:\\Datasets\\selfmotion\\{dataset}", batch_size, video_dim, grayscale=True, shuffle=True)
+    data = SelfmotionDataGenerator(f"G:\\Datasets\\selfmotion\\{dataset}", batch_size, video_dim, grayscale=True, shuffle=True)
     y_true = data[0][0][0]
+    # y_true = data[0][1][0]
     reconstructed_images, latent_representations, predicted_heading = generator.reconstruct(np.expand_dims(y_true, 0))
 
 
-    optimizer = GeneticOptimizer(sample_points, generator, ground_truth=y_true)
-    optimizer.step()
-    optimizer.step()
-    optimizer.step()
-    optimizer.step()
-    optimizer.step()
+    # optimizer = GeneticOptimizer(100, generator, ground_truth=y_true, selectivity=0.8, mutation_rate=0.1, mutation_size=0.01)
+    # optimizer.step()
+    # optimizer.step()
+    # optimizer.step()
+    # optimizer.step()
+    # optimizer.step()
 
     optimizer = FDGDOptimizer(sample_points, generator, learning_rate, search_radius, ground_truth=y_true)
+    # optimizer = FDGDOptimizer(sample_points, generator, learning_rate, search_radius, ground_truth=predicted_heading)
     
 
     rating = np.zeros(iterations)
@@ -167,7 +215,9 @@ if __name__ == "__main__":
     x = np.arange(iterations) * sample_points * 2
 
     t = tqdm(np.arange(iterations))
+    # t = np.arange(iterations)
     for i in t:
+        # print(f"{i}/{t.size}")
         optimizer.step()
         current_guess = optimizer.generator.decoder.predict(np.expand_dims(optimizer.c0, 0))
         predicted_heading = optimizer.generator.heading_decoder.predict(np.expand_dims(optimizer.c0, 0))
@@ -176,6 +226,7 @@ if __name__ == "__main__":
         embedding_error[i] = mse(latent_representations, optimizer.c0)
         heading_error[i] = mse(data[0][1][1], predicted_heading)
         t.set_description(f"rating: {rating[i]:.4f}, mean delta_y: {optimizer.delta_y.mean():.4f}", refresh=True)
+        # t.set_description(f"rating: {rating[i]:.4f}", refresh=True)
         if i%save_intervall == 0:
             save_video(f"optimizer_results/{prefix}__it_{i}#sp_{sample_points}#lr_{learning_rate}#sr_{search_radius}#rating_{rating[i]:.4f}_guess.mp4", current_guess[0]*255)
 

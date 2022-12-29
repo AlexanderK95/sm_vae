@@ -72,7 +72,7 @@ def plot_reconstructed_videos(videos, reconstructed_videos):
     pass
 
 def save_video(fname, video):
-    skvideo.io.vwrite(fname, video)
+    skvideo.io.vwrite(fname, video, inputdict={'-r': '8'})
 
 if __name__ == "__main__":
 
